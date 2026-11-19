@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agendas Escolares · Generador para Dirección</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<style>
+  :root{
+    --navy:#16213E;
+    --navy-2:#1F2E52;
+    --cream:#F3EEDD;
+    --paper:#FBF8EF;
+    --line:#D9CFAE;
+    --gold:#C89B3C;
+    --gold-dark:#9E7A28;
+    --red:#B23A2E;
+    --ink:#20242E;
+    --ink-soft:#5B5D66;
+    --green:#3E6B4F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    background:var(--navy);
+  }
+  .app{ display:flex; min-height:100vh; }
+  .rail{
+    width:96px; flex:0 0 96px; background:var(--navy);
+    display:flex; flex-direction:column; padding:22px 0; gap:6px;
+    position:sticky; top:0; height:100vh;
+  }
+  .rail-brand{
+    color:var(--gold); font-family:'IBM Plex Mono',monospace; font-size:10px;
+    letter-spacing:.04em; text-align:center; padding:0 8px 18px 8px; line-height:1.4;
+    border-bottom:1px solid rgba(255,255,255,.12); margin:0 12px 14px 12px;
+  }
+  .tab-btn{
+    border:none; background:transparent; color:#B9C0D6; font-family:'Inter',sans-serif;
+    font-size:12.5px; font-weight:600; padding:14px 6px; margin:0 6px; cursor:pointer;
+    border-radius:10px 4px 4px 10px; text-align:left; display:flex; flex-direction:column;
+    gap:4px; align-items:center; transition:background .15s ease, color .15s ease;
+  }
+  .tab-btn .num{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--gold); }
+  .tab-btn:hover{ background:rgba(255,255,255,.06); color:#fff; }
+  .tab-btn.active{ background:var(--paper); color:var(--navy); }
+  .tab-btn.active .num{ color:var(--gold-dark); }
+  .sheet{
+    flex:1;
+    background:
+      linear-gradient(90deg, transparent 0 46px, rgba(178,58,46,.28) 46px 47px, transparent 47px 100%),
+      repeating-linear-gradient(var(--paper), var(--paper) 30px, #EFE9D6 31px);
+    min-height:100vh; padding:36px 40px 80px 64px;
+  }
+  .panel{ display:none; max-width:960px; }
+  .panel.active{ display:block; }
+  h1.page-title{ font-family:'Fraunces',serif; font-weight:600; font-size:30px; color:var(--navy); margin:0 0 4px 0; }
+  h2.section-title{ font-family:'Fraunces',serif; font-weight:600; font-size:20px; color:var(--navy); margin:30px 0 6px 0; }
+  .page-sub{ font-size:13.5px; color:var(--ink-soft); margin:0 0 26px 0; max-width:66ch; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:20px 22px; margin-bottom:18px; box-shadow:0 1px 0 rgba(0,0,0,.03); }
+  .card h2{ font-family:'Fraunces',serif; font-size:17px; font-weight:600; color:var(--navy); margin:0 0 14px 0; }
+  label.field-label{ display:block; font-size:11.5px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; margin-bottom:5px; }
+  input[type=text], input[type=number], select, textarea{
+    width:100%; font-family:'Inter',sans-serif; font-size:14px; padding:9px 11px;
+    border:1px solid var(--line); border-radius:5px; background:#FEFDF9; color:var(--ink);
+  }
+  textarea{ resize:vertical; min-height:90px; }
+  input:focus, select:focus, textarea:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .row{ display:flex; gap:14px; flex-wrap:wrap; }
+  .row > div{ flex:1; min-width:150px; }
+  .btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; padding:10px 18px;
+    border-radius:5px; border:1px solid var(--navy); background:var(--navy); color:#fff;
+    cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+  }
+  .btn:hover{ background:var(--navy-2); }
+  .btn.gold{ background:var(--gold); border-color:var(--gold-dark); color:#241B04; }
+  .btn.gold:hover{ background:var(--gold-dark); color:#fff; }
+  .btn.ghost{ background:transparent; color:var(--navy); }
+  .btn.ghost:hover{ background:rgba(22,33,62,.06); }
+  .btn.danger{ background:transparent; border-color:var(--red); color:var(--red); padding:6px 10px; font-size:12px; }
+  .btn.danger:hover{ background:var(--red); color:#fff; }
+  .btn.small{ padding:6px 12px; font-size:12.5px; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .file-drop{ border:1.5px dashed var(--line); border-radius:6px; padding:14px; font-size:12.5px; color:var(--ink-soft); background:#FDFBF3; }
+  .file-drop input{ margin-top:8px; font-size:12.5px; }
+  .list-item{ display:flex; justify-content:space-between; align-items:center; padding:10px 4px; border-bottom:1px solid var(--line); gap:10px; }
+  .list-item:last-child{ border-bottom:none; }
+  .pill{ display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--navy); background:#EDE6CE; border:1px solid var(--line); border-radius:20px; padding:2px 9px; margin:2px 4px 2px 0; }
+  .muted{ color:var(--ink-soft); font-size:12.5px; }
+  .empty-state{ text-align:center; padding:36px 10px; color:var(--ink-soft); font-size:13.5px; }
+  .empty-state .icon{ font-size:26px; display:block; margin-bottom:8px; }
+  .group-detail{ margin-top:8px; padding-top:10px; border-top:1px dashed var(--line); }
+  .checklist{ display:flex; flex-wrap:wrap; gap:8px; max-height:180px; overflow-y:auto; padding:10px; border:1px solid var(--line); border-radius:5px; background:#FDFBF3; }
+  .chk{ display:flex; align-items:center; gap:6px; font-size:12.5px; background:#fff; border:1px solid var(--line); border-radius:20px; padding:4px 10px 4px 6px; }
+  .agenda-card{ background:#fff; border:1px solid var(--line); border-left:5px solid var(--gold); border-radius:4px; padding:16px 18px; margin-bottom:14px; }
+  .agenda-card .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .agenda-card .num-badge{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--gold-dark); font-weight:600; }
+  .agenda-card h3{ font-family:'Fraunces',serif; font-size:17px; margin:2px 0 4px 0; color:var(--navy); }
+  .agenda-card .actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+  .banner{ background:#EFE9D6; border:1px solid var(--line); border-radius:6px; padding:12px 16px; font-size:12.5px; color:var(--ink-soft); margin-bottom:18px; }
+  .two-col{ display:grid; grid-template-columns:1.1fr .9fr; gap:18px; }
+  @media (max-width:840px){
+    .rail{ width:70px; flex:0 0 70px; } .rail-brand{ display:none; }
+    .tab-btn span.label{ font-size:10.5px; } .sheet{ padding:26px 16px 70px 34px; }
+    .two-col{ grid-template-columns:1fr; }
+  }
+  code.k{ background:#EFE9D6; padding:1px 5px; border-radius:3px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; }
+
+  /* ---- Machote visual (drag & drop de páginas) ---- */
+  .board{ display:flex; flex-wrap:wrap; gap:16px; padding:18px 10px; background:#EFE9D6; border:1px solid var(--line); border-radius:8px; }
+  .page-thumb{
+    width:118px; background:#fff; border:1px solid #C8BE9E; border-radius:3px;
+    box-shadow:0 2px 5px rgba(0,0,0,.15); cursor:grab; padding:0; position:relative;
+    display:flex; flex-direction:column; user-select:none; transition:transform .12s ease;
+  }
+  .page-thumb:active{ cursor:grabbing; }
+  .page-thumb.drag-over{ outline:2px dashed var(--gold); outline-offset:2px; }
+  .page-thumb .thumb-visual{
+    height:132px; border-bottom:1px solid var(--line); background:#FBF8EF;
+    background-size:cover; background-position:center;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .page-thumb .thumb-label{ font-size:10.5px; font-weight:600; color:var(--navy); text-align:center; padding:7px 5px 4px 5px; line-height:1.25; }
+  .page-thumb .thumb-note{ font-size:9px; color:var(--ink-soft); text-align:center; padding:0 5px 7px 5px; }
+  .page-thumb .badge-num{
+    position:absolute; top:-8px; left:-8px; width:22px; height:22px; border-radius:50%;
+    background:var(--gold); color:#241B04; font-family:'IBM Plex Mono',monospace; font-weight:700;
+    font-size:11px; display:flex; align-items:center; justify-content:center; border:2px solid #fff;
+  }
+  .page-thumb .mini-btns{ display:flex; justify-content:space-between; padding:0 5px 6px 5px; }
+  .mini-lines span{ display:block; height:3px; background:#D9CFAE; margin:5px 8px; border-radius:2px; }
+  .mini-lines span:nth-child(1){ width:70%; } .mini-lines span:nth-child(2){ width:85%; } .mini-lines span:nth-child(3){ width:55%; }
+  .mini-table{ width:88%; }
+  .mini-table .r{ display:flex; gap:2px; margin:3px 0; }
+  .mini-table .c{ flex:1; height:6px; background:#D9CFAE; border-radius:1px; }
+  .mini-ruled{ width:100%; height:100%; background-image:repeating-linear-gradient(#fff, #fff 11px, #E4DCC2 12px); }
+  .mini-icon{ font-size:26px; }
+  .import-preview-row{ border:1px solid var(--line); border-radius:6px; padding:10px; margin-bottom:10px; background:#FDFBF3; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" id="rail"></nav>
+  <main class="sheet">
+
+    <!-- 1. GRUPOS Y MAESTROS (fusionadas) -->
+    <section class="panel" id="panel-grupos">
+      <h1 class="page-title">Grupos y alumnos
+        <button class="btn danger" style="float:right;" onclick="resetAllData()">🗑️ Borrar todos los datos</button>
+      </h1>
+      <p class="page-sub">Da de alta las listas de alumnos por grado y grupo. En cuanto subas o captures las listas, el programa arma automáticamente el listado general de toda la escuela. No es necesario ver todos los nombres aquí: cada grupo solo muestra cuántos alumnos tiene, y puedes desplegar la lista si quieres revisarla.</p>
+
+      <div id="listado-general-box"></div>
+
+      <div class="two-col">
+        <div class="card">
+          <h2>Nuevo grado y grupo (manual)</h2>
+          <div class="row">
+            <div><label class="field-label">Grado</label><input type="text" id="in-grado" placeholder="Ej. 1°, 2°, 3°"></div>
+            <div><label class="field-label">Grupo</label><input type="text" id="in-grupo" placeholder="Ej. A, B, Único"></div>
+          </div>
+          <button class="btn gold" style="margin-top:12px;" onclick="addGrupo()">+ Crear grupo</button>
+        </div>
+
+        <div class="card">
+          <h2>Importar TODA la escuela desde un archivo</h2>
+          <p class="muted" style="margin-top:-6px;">Un archivo <code class="k">.csv</code> o <code class="k">.xlsx</code> (Excel) con columnas <code class="k">grado, grupo, alumno</code>. Se crean los grupos que falten y se arma el machote automáticamente.</p>
+          <input type="file" id="file-escuela-completa" accept=".csv,.txt,.xlsx,.xls">
+          <button class="btn ghost small" style="margin-top:10px;" onclick="importEscuelaCompleta()">Importar archivo</button>
+          <p class="muted" id="import-escuela-status"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Importar desde un concentrado de calificaciones (Excel oficial, varias hojas)</h2>
+        <p class="muted" style="margin-top:-6px;">Para boletas/concentrados donde <strong>cada hoja del Excel es un grupo</strong> (con el nombre del grupo arriba y la columna "NOMBRE DEL ESTUDIANTE"). El programa detecta automáticamente el grupo de cada hoja y solo toma los nombres — ignora las calificaciones.</p>
+        <input type="file" id="file-concentrado" accept=".xlsx,.xls">
+        <button class="btn ghost small" style="margin-top:10px;" onclick="importConcentradoCalificaciones()">Importar todas las hojas</button>
+        <p class="muted" id="import-concentrado-status"></p>
+      </div>
+
+      <div id="grupos-list"></div>
+    </section>
+
+    <!-- 2. CARGAR DOCENTES -->
+    <section class="panel" id="panel-docentes">
+      <h1 class="page-title">Cargar docentes</h1>
+      <p class="page-sub">Registra a cada maestro y los grupos donde da clase, de la forma que te sea más cómoda: capturando uno por uno, subiendo un archivo con varios a la vez, o adjuntando la imagen de su horario para que el programa detecte los grupos automáticamente.</p>
+
+      <div class="card">
+        <h2>Opción 1 · Manual — nombre, materia y grupos</h2>
+        <p class="muted" style="margin-top:-6px;">Por ejemplo: <em>Francisco, Matemáticas, grupos 1E, 1J, 1K, 2H, 2F, 3A.</em></p>
+        <div class="row">
+          <div><label class="field-label">Nombre del maestro</label><input type="text" id="in-maestro-nombre" placeholder="Ej. Francisco Ramírez"></div>
+          <div><label class="field-label">Materia (opcional)</label><input type="text" id="in-maestro-materia" placeholder="Ej. Matemáticas"></div>
+        </div>
+        <div style="margin-top:12px;">
+          <label class="field-label">Grupos donde imparte clase</label>
+          <div class="checklist" id="maestro-grupos-checklist"></div>
+        </div>
+        <button class="btn gold" style="margin-top:14px;" onclick="addMaestro()">+ Agregar docente</button>
+      </div>
+
+      <div class="card">
+        <h2>Opción 2 · Cargar archivo con varios docentes a la vez</h2>
+        <p class="muted" style="margin-top:-6px;">Acepta <code class="k">.csv .txt .xlsx .pdf .docx .png .jpg</code> — puede ser un Word, un Excel o incluso una foto de una lista. Cada línea o fila con el formato <code class="k">nombre, materia, grupos</code>, por ejemplo:</p>
+        <p class="muted" style="margin-top:-4px;"><code class="k">Francisco, Matemáticas, 1E;1J;1K;2H;2F;3A</code></p>
+        <p class="muted" style="margin-top:-4px;">Los grupos se reconocen aunque los escribas distinto a como los diste de alta (con o sin °, comillas o espacios: "1E" encuentra a "1° E"). Para imágenes o PDF escaneado se usa lectura automática (OCR); siempre podrás revisar y corregir antes de confirmar.</p>
+        <input type="file" id="file-maestros" accept=".csv,.txt,.pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg">
+        <button class="btn ghost small" style="margin-top:10px;" onclick="leerArchivoMaestros()">Leer archivo</button>
+        <p class="muted" id="import-maestros-status"></p>
+        <div id="maestros-import-preview"></div>
+      </div>
+
+      <div class="card">
+        <h2>Opción 3 · Subir el horario del docente y relacionarlo automáticamente</h2>
+        <p class="muted" style="margin-top:-6px;">Sube la foto o captura del horario de un maestro. El programa intenta leer los grupos que aparecen en la imagen (OCR) y los relaciona solo con los grupos que ya diste de alta; la imagen también queda adjunta como referencia visual en su agenda. Siempre revisa que la relación quedó correcta.</p>
+        <div class="row">
+          <div><label class="field-label">Docente</label><select id="in-horario-maestro"></select></div>
+          <div><label class="field-label">Imagen del horario</label><input type="file" id="in-horario-file" accept="image/png,image/jpeg"></div>
+        </div>
+        <button class="btn ghost small" style="margin-top:10px;" onclick="attachHorarioImagen()">Adjuntar y relacionar grupos</button>
+        <p class="muted" id="horario-status"></p>
+      </div>
+
+      <div id="maestros-list"></div>
+    </section>
+
+    <!-- 3. DOCUMENTOS -->
+    <section class="panel" id="panel-documentos">
+      <h1 class="page-title">Documentos en común</h1>
+      <p class="page-sub">Comparte aquí las carpetas que deben llegar a los docentes: presentaciones, hojas de acuerdo del CTE, formatos, etc. Cada documento puede asignarse a todos o solo a algunos maestros; cada quien recibe su propia carpeta personalizada dentro de su agenda.</p>
+
+      <div class="card">
+        <h2>Agregar documento</h2>
+        <div class="row">
+          <div><label class="field-label">Nombre del documento</label><input type="text" id="in-doc-nombre" placeholder="Ej. Acuerdos de CTE - Sesión 1"></div>
+          <div>
+            <label class="field-label">Tipo</label>
+            <select id="in-doc-tipo">
+              <option>Presentación</option><option>Hoja de acuerdos</option><option>Formato</option><option>Circular</option><option>Otro</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div><label class="field-label">Archivo (opcional)</label><input type="file" id="in-doc-file"></div>
+          <div>
+            <label class="field-label">Asignar a</label>
+            <select id="in-doc-asignacion" onchange="toggleDocMaestroChecklist()">
+              <option value="todos">Todos los docentes</option>
+              <option value="seleccion">Seleccionar docentes</option>
+            </select>
+          </div>
+        </div>
+        <div id="doc-maestros-checklist-wrap" style="display:none; margin-top:12px;">
+          <label class="field-label">Docentes que reciben este documento</label>
+          <div class="checklist" id="doc-maestros-checklist"></div>
+        </div>
+        <button class="btn gold" style="margin-top:14px;" onclick="addDocumento()">+ Agregar documento</button>
+      </div>
+
+      <div id="documentos-list"></div>
+    </section>
+
+    <!-- 3. MACHOTE -->
+    <section class="panel" id="panel-plantilla">
+      <h1 class="page-title">Machote: acomodo visual de las hojas</h1>
+      <p class="page-sub">Arrastra las páginas para armar el orden físico real en que quedará cada agenda — igual que acomodar hojas antes de imprimir. Ese acomodo se reciclará automáticamente para todos los docentes.</p>
+
+      <div class="card">
+        <h2>Lista de asistencia y seguimiento — elige los meses a incluir</h2>
+        <p class="muted" style="margin-top:-6px;">Mezcla del listado de tus grupos con el calendario oficial de días de clase, respetando el formato de la lista guía: por cada mes que marques, se agrega UNA sola hoja horizontal por grupo con el nombre de la escuela, el grupo, los días de ese mes y un bloque de "TRABAJOS" al final — todo cabe en una página, sin hojas de más. Si no marcas ningún mes, esta hoja no se imprime.</p>
+        <div class="checklist" id="meses-asistencia-checklist"></div>
+      </div>
+
+      <div class="card">
+        <h2>Datos generales</h2>
+        <p class="muted" style="margin-top:-6px;">Se guardan con el autocompletado propio de tu navegador: la próxima vez que abras el programa, empieza a escribir y te sugerirá lo que ya habías puesto antes.</p>
+        <form autocomplete="on" onsubmit="return false;">
+          <div class="row">
+            <div><label class="field-label">Nombre de la escuela</label><input type="text" id="in-escuela" name="nombre-escuela" autocomplete="organization" oninput="state.settings.escuela=this.value"></div>
+            <div><label class="field-label">Ciclo escolar</label><input type="text" id="in-ciclo" name="ciclo-escolar" autocomplete="on" placeholder="Ej. 2026-2027" oninput="state.settings.ciclo=this.value"></div>
+          </div>
+          <div class="row" style="margin-top:14px;">
+            <div><label class="field-label">Clave de Centro de Trabajo (C.C.T.)</label><input type="text" id="in-cct" name="cct" autocomplete="on" placeholder="Ej. 11DES0131O" oninput="state.settings.cct=this.value"></div>
+            <div>
+              <label class="field-label">Turno</label>
+              <input type="text" id="in-turno" name="turno" autocomplete="on" list="turnos-sugeridos" placeholder="Ej. Vespertino" oninput="state.settings.turno=this.value">
+              <datalist id="turnos-sugeridos">
+                <option value="Matutino"><option value="Vespertino"><option value="Discontinuo"><option value="Tiempo Completo">
+              </datalist>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Imagen de ejemplo para la portada</h2>
+        <p class="muted" style="margin-top:-6px;">Sube una imagen y elige cómo usarla:</p>
+        <div class="row">
+          <label class="chk"><input type="radio" name="modo-imagen-portada" value="fondo" checked onchange="cambiarModoImagenPortada(this.value)"> Usarla de fondo, con los datos superpuestos encima</label>
+          <label class="chk"><input type="radio" name="modo-imagen-portada" value="completa" onchange="cambiarModoImagenPortada(this.value)"> Ya es mi portada terminada — úsala tal cual, sin agregar texto</label>
+        </div>
+        <input type="file" id="in-plantilla-imagen" accept="image/png,image/jpeg" onchange="handlePlantillaImagen(this)" style="margin-top:10px;">
+        <div id="plantilla-imagen-preview" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Orden físico de las hojas — arrastra para acomodar</h2>
+        <p class="muted" style="margin-top:-6px;">Cada tarjeta es una hoja de la agenda. La hoja "Horario" solo se imprime si ese docente tiene una imagen de horario adjunta.</p>
+        <div class="board" id="orden-secciones-board"></div>
+        <div id="agregar-seccion-wrap" style="margin-top:12px; display:none;">
+          <label class="field-label">Agregar una hoja opcional</label>
+          <div class="row">
+            <div><select id="in-seccion-agregar"></select></div>
+            <div style="flex:0 0 auto;"><button class="btn ghost small" onclick="agregarSeccionOpcional()">+ Agregar al orden</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="documentos-orden-wrap" style="display:none;">
+        <h2>Orden de los documentos adjuntos, dentro de esa página</h2>
+        <p class="muted" style="margin-top:-6px;">Arrastra para decidir en qué orden aparecen los documentos comunes dentro de la sección "Documentos comunes". Las imágenes y PDF que hayas adjuntado se incrustan de verdad en la agenda descargada, en este mismo orden.</p>
+        <div class="board" id="documentos-orden-board"></div>
+      </div>
+
+      <div class="card">
+        <h2>Texto de portada</h2>
+        <p class="muted" style="margin-top:-6px;">Variables disponibles: <code class="k">{numero}</code> <code class="k">{docente}</code> <code class="k">{materia}</code> <code class="k">{grupos}</code> <code class="k">{escuela}</code> <code class="k">{ciclo}</code></p>
+        <textarea id="in-plantilla" style="min-height:170px; font-family:'IBM Plex Mono',monospace; font-size:12.5px;" oninput="state.plantilla.texto=this.value"></textarea>
+        <button class="btn ghost small" style="margin-top:12px;" onclick="resetPlantilla()">Restaurar texto y orden por defecto</button>
+      </div>
+    </section>
+
+    <!-- 4. AGENDAS -->
+    <section class="panel" id="panel-agendas">
+      <h1 class="page-title">Agendas generadas</h1>
+      <p class="page-sub">Con la información de alumnos, docentes, documentos y el machote, aquí se arma la agenda individual de cada maestro, lista para descargar.</p>
+
+      <div class="toolbar">
+        <button class="btn gold" onclick="renderAgendasPanel(true)">↻ Generar / actualizar agendas</button>
+        <button class="btn ghost" onclick="exportPDFTodas()">⬇ Descargar todas juntas (PDF clasificado)</button>
+        <button class="btn ghost" onclick="exportDocTodas()">⬇ Descargar todas en Word (.doc) para ajustes manuales</button>
+      </div>
+
+      <div id="agendas-summary" class="banner" style="display:none;"></div>
+      <div id="agendas-list"></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ============================= ESTADO ============================= */
+let idSeq = 1;
+const uid = () => 'id' + (idSeq++);
+
+const DEFAULT_PLANTILLA_TEXTO =
+`{escuela}
+C.C.T. {cct}
+Ciclo escolar {ciclo}   ·   Turno {turno}
+
+AGENDA ESCOLAR DEL DOCENTE N.° {numero}
+
+Nombre del docente: {docente}
+Materia / función: {materia}
+Grupos que atiende: {grupos}
+
+Esta agenda contiene, para uso exclusivo de este docente:
+  1. Lista de alumnos de cada grupo a su cargo.
+  2. Documentos y acuerdos comunes asignados por Dirección.
+  3. Espacio en blanco para anotaciones y ajustes manuales.`;
+
+const DEFAULT_ORDEN = ['portada','horario','asistencia','documentos','notas'];
+const SECTION_LABELS = {
+  portada:    'Portada',
+  horario:    'Horario del docente',
+  grupos:     'Listas de alumnos',
+  asistencia: 'Lista de asistencia y seguimiento',
+  documentos: 'Documentos comunes',
+  notas:      'Notas / ajustes manuales',
+};
+const SECTION_NOTES = {
+  portada:    'Datos del docente + imagen de ejemplo',
+  horario:    'Solo si el docente tiene imagen cargada',
+  grupos:     'Opcional: ya no viene por defecto (redundante con asistencia)',
+  asistencia: 'Una hoja por grupo/mes, con nombres + días + trabajos',
+  documentos: 'Carpeta personalizada del docente',
+  notas:      'Espacio en blanco para escribir',
+};
+
+/* Calendario oficial 2026-2027 SEG Guanajuato (incluido como referencia por defecto para la
+   Lista de asistencia y seguimiento). Agrupado por mes; cada día trae letra, número y planeación. */
+const CALENDARIO_MESES = [{"mes":"AGOSTO","dias":[{"l":"L","n":24,"p":"PLANEACIÓN 01"},{"l":"M","n":25,"p":"PLANEACIÓN 01"},{"l":"M","n":26,"p":"PLANEACIÓN 01"},{"l":"J","n":27,"p":"PLANEACIÓN 01"},{"l":"V","n":28,"p":"PLANEACIÓN 01"},{"l":"L","n":31,"p":"PLANEACIÓN 01"}]},{"mes":"SEPTIEMBRE","dias":[{"l":"M","n":1,"p":"PLANEACIÓN 02"},{"l":"M","n":2,"p":"PLANEACIÓN 02"},{"l":"J","n":3,"p":"PLANEACIÓN 02"},{"l":"V","n":4,"p":"PLANEACIÓN 02"},{"l":"L","n":7,"p":"PLANEACIÓN 02"},{"l":"M","n":8,"p":"PLANEACIÓN 02"},{"l":"M","n":9,"p":"PLANEACIÓN 02"},{"l":"J","n":10,"p":"PLANEACIÓN 02"},{"l":"V","n":11,"p":"PLANEACIÓN 02"},{"l":"L","n":14,"p":"PLANEACIÓN 02"},{"l":"M","n":15,"p":"PLANEACIÓN 02"},{"l":"M","n":16,"p":"PLANEACIÓN 02"},{"l":"J","n":17,"p":"PLANEACIÓN 02"},{"l":"V","n":18,"p":"PLANEACIÓN 02"},{"l":"L","n":21,"p":"PLANEACIÓN 02"},{"l":"M","n":22,"p":"PLANEACIÓN 02"},{"l":"M","n":23,"p":"PLANEACIÓN 02"},{"l":"J","n":24,"p":"PLANEACIÓN 02"},{"l":"V","n":25,"p":"PLANEACIÓN 02"},{"l":"L","n":28,"p":"PLANEACIÓN 02"},{"l":"M","n":29,"p":"PLANEACIÓN 02"},{"l":"M","n":30,"p":"PLANEACIÓN 02"}]},{"mes":"OCTUBRE","dias":[{"l":"J","n":1,"p":"PLANEACIÓN 03"},{"l":"V","n":2,"p":"PLANEACIÓN 03"},{"l":"L","n":5,"p":"PLANEACIÓN 03"},{"l":"M","n":6,"p":"PLANEACIÓN 03"},{"l":"M","n":7,"p":"PLANEACIÓN 03"},{"l":"J","n":8,"p":"PLANEACIÓN 03"},{"l":"V","n":9,"p":"PLANEACIÓN 03"},{"l":"L","n":12,"p":"PLANEACIÓN 03"},{"l":"M","n":13,"p":"PLANEACIÓN 03"},{"l":"M","n":14,"p":"PLANEACIÓN 03"},{"l":"J","n":15,"p":"PLANEACIÓN 03"},{"l":"V","n":16,"p":"PLANEACIÓN 03"},{"l":"L","n":19,"p":"PLANEACIÓN 03"},{"l":"M","n":20,"p":"PLANEACIÓN 03"},{"l":"M","n":21,"p":"PLANEACIÓN 03"},{"l":"J","n":22,"p":"PLANEACIÓN 03"},{"l":"V","n":23,"p":"PLANEACIÓN 03"},{"l":"L","n":26,"p":"PLANEACIÓN 03"},{"l":"M","n":27,"p":"PLANEACIÓN 03"},{"l":"M","n":28,"p":"PLANEACIÓN 03"},{"l":"J","n":29,"p":"PLANEACIÓN 03"},{"l":"V","n":30,"p":"PLANEACIÓN 03"}]},{"mes":"NOVIEMBRE","dias":[{"l":"L","n":2,"p":"PLANEACIÓN 04"},{"l":"M","n":3,"p":"PLANEACIÓN 04"},{"l":"M","n":4,"p":"PLANEACIÓN 04"},{"l":"J","n":5,"p":"PLANEACIÓN 04"},{"l":"V","n":6,"p":"PLANEACIÓN 04"},{"l":"L","n":9,"p":"PLANEACIÓN 04"},{"l":"M","n":10,"p":"PLANEACIÓN 04"},{"l":"M","n":11,"p":"PLANEACIÓN 04"},{"l":"J","n":12,"p":"PLANEACIÓN 04"},{"l":"V","n":13,"p":"PLANEACIÓN 04"},{"l":"L","n":16,"p":"PLANEACIÓN 04"},{"l":"M","n":17,"p":"PLANEACIÓN 04"},{"l":"M","n":18,"p":"PLANEACIÓN 04"},{"l":"J","n":19,"p":"PLANEACIÓN 04"},{"l":"V","n":20,"p":"PLANEACIÓN 04"},{"l":"L","n":23,"p":"PLANEACIÓN 04"},{"l":"M","n":24,"p":"PLANEACIÓN 04"},{"l":"M","n":25,"p":"PLANEACIÓN 04"},{"l":"J","n":26,"p":"PLANEACIÓN 04"},{"l":"V","n":27,"p":"PLANEACIÓN 04"},{"l":"L","n":30,"p":"PLANEACIÓN 04"}]},{"mes":"DICIEMBRE","dias":[{"l":"M","n":1,"p":"PLANEACIÓN 05"},{"l":"M","n":2,"p":"PLANEACIÓN 05"},{"l":"J","n":3,"p":"PLANEACIÓN 05"},{"l":"V","n":4,"p":"PLANEACIÓN 05"},{"l":"L","n":7,"p":"PLANEACIÓN 05"},{"l":"M","n":8,"p":"PLANEACIÓN 05"},{"l":"M","n":9,"p":"PLANEACIÓN 05"},{"l":"J","n":10,"p":"PLANEACIÓN 05"},{"l":"V","n":11,"p":"PLANEACIÓN 05"},{"l":"L","n":14,"p":"PLANEACIÓN 05"},{"l":"M","n":15,"p":"PLANEACIÓN 05"},{"l":"M","n":16,"p":"PLANEACIÓN 05"},{"l":"J","n":17,"p":"PLANEACIÓN 05"},{"l":"V","n":18,"p":"PLANEACIÓN 05"},{"l":"L","n":21,"p":"PLANEACIÓN 05"},{"l":"M","n":22,"p":"PLANEACIÓN 05"},{"l":"M","n":23,"p":"PLANEACIÓN 05"},{"l":"J","n":24,"p":"PLANEACIÓN 05"},{"l":"V","n":25,"p":"PLANEACIÓN 05"},{"l":"L","n":28,"p":"PLANEACIÓN 05"},{"l":"M","n":29,"p":"PLANEACIÓN 05"},{"l":"M","n":30,"p":"PLANEACIÓN 05"},{"l":"J","n":31,"p":"PLANEACIÓN 05"}]},{"mes":"ENERO","dias":[{"l":"V","n":1,"p":"PLANEACIÓN 06"},{"l":"L","n":4,"p":"PLANEACIÓN 06"},{"l":"M","n":5,"p":"PLANEACIÓN 06"},{"l":"M","n":6,"p":"PLANEACIÓN 06"},{"l":"J","n":7,"p":"PLANEACIÓN 06"},{"l":"V","n":8,"p":"PLANEACIÓN 06"},{"l":"L","n":11,"p":"PLANEACIÓN 06"},{"l":"M","n":12,"p":"PLANEACIÓN 06"},{"l":"M","n":13,"p":"PLANEACIÓN 06"},{"l":"J","n":14,"p":"PLANEACIÓN 06"},{"l":"V","n":15,"p":"PLANEACIÓN 06"},{"l":"L","n":18,"p":"PLANEACIÓN 06"},{"l":"M","n":19,"p":"PLANEACIÓN 06"},{"l":"M","n":20,"p":"PLANEACIÓN 06"},{"l":"J","n":21,"p":"PLANEACIÓN 06"},{"l":"V","n":22,"p":"PLANEACIÓN 06"},{"l":"L","n":25,"p":"PLANEACIÓN 06"},{"l":"M","n":26,"p":"PLANEACIÓN 06"},{"l":"M","n":27,"p":"PLANEACIÓN 06"},{"l":"J","n":28,"p":"PLANEACIÓN 06"},{"l":"V","n":29,"p":"PLANEACIÓN 06"}]},{"mes":"FEBRERO","dias":[{"l":"L","n":1,"p":"PLANEACIÓN 07"},{"l":"M","n":2,"p":"PLANEACIÓN 07"},{"l":"M","n":3,"p":"PLANEACIÓN 07"},{"l":"J","n":4,"p":"PLANEACIÓN 07"},{"l":"V","n":5,"p":"PLANEACIÓN 07"},{"l":"L","n":8,"p":"PLANEACIÓN 07"},{"l":"M","n":9,"p":"PLANEACIÓN 07"},{"l":"M","n":10,"p":"PLANEACIÓN 07"},{"l":"J","n":11,"p":"PLANEACIÓN 07"},{"l":"V","n":12,"p":"PLANEACIÓN 07"},{"l":"L","n":15,"p":"PLANEACIÓN 07"},{"l":"M","n":16,"p":"PLANEACIÓN 07"},{"l":"M","n":17,"p":"PLANEACIÓN 07"},{"l":"J","n":18,"p":"PLANEACIÓN 07"},{"l":"V","n":19,"p":"PLANEACIÓN 07"},{"l":"L","n":22,"p":"PLANEACIÓN 07"},{"l":"M","n":23,"p":"PLANEACIÓN 07"},{"l":"M","n":24,"p":"PLANEACIÓN 07"},{"l":"J","n":25,"p":"PLANEACIÓN 07"},{"l":"V","n":26,"p":"PLANEACIÓN 07"}]},{"mes":"MARZO","dias":[{"l":"L","n":1,"p":"PLANEACIÓN 08"},{"l":"M","n":2,"p":"PLANEACIÓN 08"},{"l":"M","n":3,"p":"PLANEACIÓN 08"},{"l":"J","n":4,"p":"PLANEACIÓN 08"},{"l":"V","n":5,"p":"PLANEACIÓN 08"},{"l":"L","n":8,"p":"PLANEACIÓN 08"},{"l":"M","n":9,"p":"PLANEACIÓN 08"},{"l":"M","n":10,"p":"PLANEACIÓN 08"},{"l":"J","n":11,"p":"PLANEACIÓN 08"},{"l":"V","n":12,"p":"PLANEACIÓN 08"},{"l":"L","n":15,"p":"PLANEACIÓN 08"},{"l":"M","n":16,"p":"PLANEACIÓN 08"},{"l":"M","n":17,"p":"PLANEACIÓN 08"},{"l":"J","n":18,"p":"PLANEACIÓN 08"},{"l":"V","n":19,"p":"PLANEACIÓN 08"},{"l":"L","n":22,"p":"PLANEACIÓN 08"},{"l":"M","n":23,"p":"PLANEACIÓN 08"},{"l":"M","n":24,"p":"PLANEACIÓN 08"},{"l":"J","n":25,"p":"PLANEACIÓN 08"},{"l":"V","n":26,"p":"PLANEACIÓN 08"},{"l":"L","n":29,"p":"PLANEACIÓN 08"},{"l":"M","n":30,"p":"PLANEACIÓN 08"},{"l":"M","n":31,"p":"PLANEACIÓN 08"}]},{"mes":"ABRIL","dias":[{"l":"J","n":1,"p":"PLANEACIÓN 09"},{"l":"V","n":2,"p":"PLANEACIÓN 09"},{"l":"L","n":5,"p":"PLANEACIÓN 09"},{"l":"M","n":6,"p":"PLANEACIÓN 09"},{"l":"M","n":7,"p":"PLANEACIÓN 09"},{"l":"J","n":8,"p":"PLANEACIÓN 09"},{"l":"V","n":9,"p":"PLANEACIÓN 09"},{"l":"L","n":12,"p":"PLANEACIÓN 09"},{"l":"M","n":13,"p":"PLANEACIÓN 09"},{"l":"M","n":14,"p":"PLANEACIÓN 09"},{"l":"J","n":15,"p":"PLANEACIÓN 09"},{"l":"V","n":16,"p":"PLANEACIÓN 09"},{"l":"L","n":19,"p":"PLANEACIÓN 09"},{"l":"M","n":20,"p":"PLANEACIÓN 09"},{"l":"M","n":21,"p":"PLANEACIÓN 09"},{"l":"J","n":22,"p":"PLANEACIÓN 09"},{"l":"V","n":23,"p":"PLANEACIÓN 09"},{"l":"L","n":26,"p":"PLANEACIÓN 09"},{"l":"M","n":27,"p":"PLANEACIÓN 09"},{"l":"M","n":28,"p":"PLANEACIÓN 09"},{"l":"J","n":29,"p":"PLANEACIÓN 09"},{"l":"V","n":30,"p":"PLANEACIÓN 09"}]},{"mes":"MAYO","dias":[{"l":"L","n":3,"p":"PLANEACIÓN 10"},{"l":"M","n":4,"p":"PLANEACIÓN 10"},{"l":"M","n":5,"p":"PLANEACIÓN 10"},{"l":"J","n":6,"p":"PLANEACIÓN 10"},{"l":"V","n":7,"p":"PLANEACIÓN 10"},{"l":"L","n":10,"p":"PLANEACIÓN 10"},{"l":"M","n":11,"p":"PLANEACIÓN 10"},{"l":"M","n":12,"p":"PLANEACIÓN 10"},{"l":"J","n":13,"p":"PLANEACIÓN 10"},{"l":"V","n":14,"p":"PLANEACIÓN 10"},{"l":"L","n":17,"p":"PLANEACIÓN 10"},{"l":"M","n":18,"p":"PLANEACIÓN 10"},{"l":"M","n":19,"p":"PLANEACIÓN 10"},{"l":"J","n":20,"p":"PLANEACIÓN 10"},{"l":"V","n":21,"p":"PLANEACIÓN 10"},{"l":"L","n":24,"p":"PLANEACIÓN 10"},{"l":"M","n":25,"p":"PLANEACIÓN 10"},{"l":"M","n":26,"p":"PLANEACIÓN 10"},{"l":"J","n":27,"p":"PLANEACIÓN 10"},{"l":"V","n":28,"p":"PLANEACIÓN 10"},{"l":"L","n":31,"p":"PLANEACIÓN 10"}]},{"mes":"JUNIO","dias":[{"l":"M","n":1,"p":"PLANEACIÓN 11"},{"l":"M","n":2,"p":"PLANEACIÓN 11"},{"l":"J","n":3,"p":"PLANEACIÓN 11"},{"l":"V","n":4,"p":"PLANEACIÓN 11"},{"l":"L","n":7,"p":"PLANEACIÓN 11"},{"l":"M","n":8,"p":"PLANEACIÓN 11"},{"l":"M","n":9,"p":"PLANEACIÓN 11"},{"l":"J","n":10,"p":"PLANEACIÓN 11"},{"l":"V","n":11,"p":"PLANEACIÓN 11"},{"l":"L","n":14,"p":"PLANEACIÓN 11"},{"l":"M","n":15,"p":"PLANEACIÓN 11"},{"l":"M","n":16,"p":"PLANEACIÓN 11"},{"l":"J","n":17,"p":"PLANEACIÓN 11"},{"l":"V","n":18,"p":"PLANEACIÓN 11"},{"l":"L","n":21,"p":"PLANEACIÓN 11"},{"l":"M","n":22,"p":"PLANEACIÓN 11"},{"l":"M","n":23,"p":"PLANEACIÓN 11"},{"l":"J","n":24,"p":"PLANEACIÓN 11"},{"l":"V","n":25,"p":"PLANEACIÓN 11"},{"l":"L","n":28,"p":"PLANEACIÓN 11"},{"l":"M","n":29,"p":"PLANEACIÓN 11"},{"l":"M","n":30,"p":"PLANEACIÓN 11"}]},{"mes":"JULIO","dias":[{"l":"J","n":1,"p":"PLANEACIÓN 12"},{"l":"V","n":2,"p":"PLANEACIÓN 12"},{"l":"L","n":5,"p":"PLANEACIÓN 12"},{"l":"M","n":6,"p":"PLANEACIÓN 12"},{"l":"M","n":7,"p":"PLANEACIÓN 12"},{"l":"J","n":8,"p":"PLANEACIÓN 12"}]}];
+
+/* Agrupa los meses con muy pocos días de clase (los "sobrantes" de fin de trimestre, como
+   Agosto o Julio) dentro de la página del mes vecino, igual que hace el Excel de referencia
+   (ej. el 31 de agosto aparece dentro de la página de Septiembre bajo su propia etiqueta "AGO"). */
+const PAGINAS_ASISTENCIA = (function(){
+  const UMBRAL = 10;
+  const resultado = [];
+  let i = 0;
+  while(i < CALENDARIO_MESES.length){
+    const actual = CALENDARIO_MESES[i];
+    if(actual.dias.length < UMBRAL && i+1 < CALENDARIO_MESES.length){
+      const siguiente = CALENDARIO_MESES[i+1];
+      resultado.push({ etiqueta: siguiente.mes, bloques:[actual, siguiente] });
+      i += 2;
+    } else if(actual.dias.length < UMBRAL && resultado.length){
+      const anterior = resultado[resultado.length-1];
+      anterior.etiqueta = anterior.bloques[anterior.bloques.length-1].mes + ' / ' + actual.mes;
+      anterior.bloques.push(actual);
+      i += 1;
+    } else {
+      resultado.push({ etiqueta: actual.mes, bloques:[actual] });
+      i += 1;
+    }
+  }
+  return resultado;
+})();
+
+let state = {
+  grupos: [],
+  maestros: [],
+  documentos: [],
+  plantilla: { texto: DEFAULT_PLANTILLA_TEXTO, imagen: null, imagenModo: 'fondo', orden: [...DEFAULT_ORDEN], mesesAsistencia: ['NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO'] },
+  settings: { escuela:'Nombre de la escuela', ciclo:'', cct:'', turno:'' }
+};
+
+/* ============================= TABS ============================= */
+const TABS = [
+  {id:'grupos',     num:'01', label:'Grupos'},
+  {id:'docentes',   num:'02', label:'Cargar Docentes'},
+  {id:'documentos', num:'03', label:'Documentos'},
+  {id:'plantilla',  num:'04', label:'Machote'},
+  {id:'agendas',    num:'05', label:'Agendas'},
+];
+function buildRail(){
+  const rail = document.getElementById('rail');
+  rail.innerHTML = `<div class="rail-brand">DIRECCIÓN<br>ESCOLAR</div>` +
+    TABS.map(t => `<button class="tab-btn" id="tabbtn-${t.id}" onclick="showTab('${t.id}')"><span class="num">${t.num}</span><span class="label">${t.label}</span></button>`).join('');
+}
+function showTab(id){
+  TABS.forEach(t=>{
+    document.getElementById('panel-'+t.id).classList.toggle('active', t.id===id);
+    document.getElementById('tabbtn-'+t.id).classList.toggle('active', t.id===id);
+  });
+  if(id==='docentes'){ renderMaestroGrupoChecklist(); renderHorarioMaestroSelect(); }
+  if(id==='documentos') renderDocMaestroChecklist();
+  if(id==='plantilla'){
+    document.getElementById('in-plantilla').value = state.plantilla.texto;
+    document.getElementById('in-escuela').value = state.settings.escuela;
+    document.getElementById('in-ciclo').value = state.settings.ciclo;
+    document.getElementById('in-cct').value = state.settings.cct;
+    document.getElementById('in-turno').value = state.settings.turno;
+    document.querySelectorAll('input[name="modo-imagen-portada"]').forEach(r=>{ r.checked = (r.value===state.plantilla.imagenModo); });
+    renderPlantillaImagenPreview();
+    renderOrdenSecciones();
+    renderDocumentosOrdenBoard();
+    renderMesesAsistenciaChecklist();
+  }
+}
+
+/* ============================= HELPERS ============================= */
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function grupoById(id){ return state.grupos.find(g=>g.id===id); }
+function maestroById(id){ return state.maestros.find(m=>m.id===id); }
+function download(filename, blob){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function readImageForDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      const img = new Image();
+      img.onload = () => resolve({dataUrl, tipo: file.type.includes('png')?'PNG':'JPEG', ratio: img.naturalHeight/img.naturalWidth});
+      img.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+      img.src = dataUrl;
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============================= RESET ============================= */
+function resetAllData(){
+  if(!confirm('Esto borrará TODOS los grupos, alumnos, docentes y documentos cargados. ¿Continuar?')) return;
+  state.grupos = [];
+  state.maestros = [];
+  state.documentos = [];
+  state.plantilla = { texto: DEFAULT_PLANTILLA_TEXTO, imagen: null, orden: [...DEFAULT_ORDEN] };
+  renderGrupos(); renderListadoGeneral(); renderMaestroGrupoChecklist(); renderMaestros();
+  renderHorarioMaestroSelect(); renderDocumentos(); renderAgendasPanel();
+  renderPlantillaImagenPreview(); renderOrdenSecciones();
+  document.getElementById('in-plantilla').value = state.plantilla.texto;
+}
+
+/* ============================= GRUPOS / ALUMNOS ============================= */
+function findOrCreateGrupo(grado, grupo){
+  const label = `${grado} ${grupo}`.trim();
+  let g = state.grupos.find(x=>x.label.toLowerCase()===label.toLowerCase());
+  if(!g){ g = {id:uid(), grado, grupo, label, alumnos:[], expanded:false}; state.grupos.push(g); }
+  return g;
+}
+function addGrupo(){
+  const grado = document.getElementById('in-grado').value.trim();
+  const grupo = document.getElementById('in-grupo').value.trim();
+  if(!grado || !grupo){ alert('Escribe el grado y el grupo.'); return; }
+  const label = `${grado} ${grupo}`;
+  if(state.grupos.some(g=>g.label.toLowerCase()===label.toLowerCase())){ alert('Ese grado y grupo ya existe.'); return; }
+  state.grupos.push({id:uid(), grado, grupo, label, alumnos:[], expanded:false});
+  document.getElementById('in-grado').value=''; document.getElementById('in-grupo').value='';
+  renderGrupos(); renderListadoGeneral();
+}
+function deleteGrupo(id){
+  if(!confirm('¿Eliminar este grupo y su lista de alumnos?')) return;
+  state.grupos = state.grupos.filter(g=>g.id!==id);
+  state.maestros.forEach(m => m.grupoIds = m.grupoIds.filter(gid=>gid!==id));
+  renderGrupos(); renderListadoGeneral(); renderMaestros();
+}
+function addAlumnosBulk(grupoId){
+  const ta = document.getElementById('bulk-'+grupoId);
+  const names = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!names.length) return;
+  grupoById(grupoId).alumnos.push(...names);
+  ta.value=''; renderGrupos(); renderListadoGeneral();
+}
+function deleteAlumno(grupoId, idx){
+  grupoById(grupoId).alumnos.splice(idx,1);
+  renderGrupos(); renderListadoGeneral();
+}
+function looksLikeGarbage(text){
+  const sample = (text||'').slice(0,3000);
+  if(!sample.trim()) return false;
+  const raro = (sample.match(/[^\x09\x0A\x0D\x20-\x7EÀ-ÿ\u2018-\u201F]/g)||[]).length;
+  return (raro / sample.length) > 0.12;
+}
+/** Lee un archivo y devuelve un arreglo de filas (arreglos de celdas de texto),
+ *  soportando .csv/.txt (texto plano) y .xlsx/.xls (Excel real vía SheetJS). */
+function parseRowsFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const name = file.name.toLowerCase();
+    if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+      if(typeof XLSX === 'undefined'){ reject(new Error('No se pudo cargar el lector de Excel (revisa tu conexión a internet). Guarda el archivo como .csv e inténtalo de nuevo.')); return; }
+      const reader = new FileReader();
+      reader.onload = e => {
+        try{
+          const wb = XLSX.read(e.target.result, {type:'array'});
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false});
+          resolve(rows.map(r => r.map(c => (c===undefined||c===null) ? '' : String(c).trim())));
+        }catch(err){ reject(new Error('No se pudo leer el archivo de Excel. Verifica que no esté dañado o protegido.')); }
+      };
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      reader.readAsArrayBuffer(file);
+    } else if(name.endsWith('.csv') || name.endsWith('.txt')){
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        if(looksLikeGarbage(text)){ reject(new Error('Este archivo no parece texto legible (¿es en realidad un .xlsx, .doc o una imagen renombrada?). Sube el formato correcto o revisa el archivo.')); return; }
+        const parsed = Papa.parse(text.trim(), {skipEmptyLines:true});
+        resolve(parsed.data);
+      };
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      reader.readAsText(file);
+    } else {
+      reject(new Error('Formato no soportado aquí. Usa .csv, .txt, .xlsx o .xls.'));
+    }
+  });
+}
+async function importAlumnosFile(grupoId){
+  const input = document.getElementById('file-'+grupoId);
+  const file = input.files[0];
+  if(!file) return;
+  try{
+    const rows = await parseRowsFromFile(file);
+    const names = rows.map(row=>row[0]).map(s=>(s||'').trim())
+      .filter(s => s && s.toLowerCase()!=='nombre' && s.toLowerCase()!=='alumno');
+    grupoById(grupoId).alumnos.push(...names);
+    input.value=''; renderGrupos(); renderListadoGeneral();
+  }catch(err){ alert(err.message); }
+}
+async function importEscuelaCompleta(){
+  const input = document.getElementById('file-escuela-completa');
+  const status = document.getElementById('import-escuela-status');
+  const file = input.files[0];
+  if(!file){ status.textContent='Selecciona un archivo primero.'; return; }
+  status.textContent = 'Leyendo archivo…';
+  try{
+    const rows = await parseRowsFromFile(file);
+    let creados = 0, agregados = 0;
+    const gruposVistos = new Set();
+    rows.forEach(row=>{
+      const grado = (row[0]||'').trim(), grupo=(row[1]||'').trim(), alumno=(row[2]||'').trim();
+      if(!grado || !grupo || !alumno) return;
+      if(grado.toLowerCase()==='grado' && grupo.toLowerCase()==='grupo') return;
+      const existiaAntes = state.grupos.some(g=>g.label.toLowerCase()===`${grado} ${grupo}`.trim().toLowerCase());
+      const g = findOrCreateGrupo(grado, grupo);
+      if(!existiaAntes && !gruposVistos.has(g.id)){ creados++; gruposVistos.add(g.id); }
+      g.alumnos.push(alumno); agregados++;
+    });
+    if(!agregados){ status.textContent = 'No se detectaron filas válidas. Revisa que tenga columnas grado, grupo, alumno.'; return; }
+    status.textContent = `Listo: ${creados} grupo(s) nuevo(s), ${agregados} alumno(s) agregado(s). Machote actualizado abajo.`;
+    input.value='';
+    renderGrupos(); renderListadoGeneral(); renderMaestroGrupoChecklist();
+  }catch(err){ status.textContent = 'Error: ' + err.message; }
+}
+/* ---- Concentrado de calificaciones (boleta oficial, una hoja por grupo) ---- */
+function extractGroupFromSheetText(rows){
+  const re = /(\d)\s*[°º]\s*"?\s*([A-Za-zÑñ])\s*"?/;
+  for(let r=0; r<Math.min(8, rows.length); r++){
+    for(let c=0; c<rows[r].length; c++){
+      const m = String(rows[r][c]||'').match(re);
+      if(m) return { grado: m[1]+'°', grupo: m[2].toUpperCase() };
+    }
+  }
+  return null;
+}
+function findNombreHeader(rows){
+  for(let r=0; r<rows.length; r++){
+    for(let c=0; c<rows[r].length; c++){
+      const cell = String(rows[r][c]||'');
+      if(/NOMBRE\s+DEL\s+ESTUDIANTE/i.test(cell)) return {row:r, col:c, cellText:cell};
+    }
+  }
+  return null;
+}
+function isSummaryRow(text){
+  return /^(promedio|reprobados|%\s*de\s*reprobaci|total\b)/i.test((text||'').trim());
+}
+function namesFromCellBlock(text){
+  const cleaned = String(text||'').replace(/NOMBRE\s+DEL\s+ESTUDIANTE/i, '');
+  return cleaned.split(/\n/).map(l=>l.replace(/^\s*\d+\s+/,'').trim()).filter(Boolean);
+}
+async function importConcentradoCalificaciones(){
+  const input = document.getElementById('file-concentrado');
+  const status = document.getElementById('import-concentrado-status');
+  const file = input.files[0];
+  if(!file){ status.textContent='Selecciona un archivo primero.'; return; }
+  if(typeof XLSX === 'undefined'){ status.textContent='No se pudo cargar el lector de Excel (revisa tu conexión a internet).'; return; }
+  status.textContent = 'Leyendo hojas…';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    let creados=0, actualizados=0, alumnosAgregados=0;
+    const sinDetectar = [];
+    wb.SheetNames.forEach(sheetName=>{
+      const sheet = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false})
+        .map(r => r.map(c => (c===undefined||c===null) ? '' : String(c)));
+      const grupoInfo = extractGroupFromSheetText(rows);
+      const header = findNombreHeader(rows);
+      if(!grupoInfo || !header){ sinDetectar.push(sheetName); return; }
+      let nombres = namesFromCellBlock(header.cellText);
+      for(let r=header.row+1; r<rows.length; r++){
+        const cellText = (rows[r][header.col]||'').trim();
+        if(!cellText) continue;
+        if(isSummaryRow(cellText)) break;
+        nombres = nombres.concat(namesFromCellBlock(cellText));
+      }
+      nombres = nombres.filter(n => n && !isSummaryRow(n));
+      if(!nombres.length){ sinDetectar.push(sheetName); return; }
+      const label = `${grupoInfo.grado} ${grupoInfo.grupo}`.toLowerCase();
+      const existiaAntes = state.grupos.some(g=>g.label.toLowerCase()===label);
+      const g = findOrCreateGrupo(grupoInfo.grado, grupoInfo.grupo);
+      existiaAntes ? actualizados++ : creados++;
+      g.alumnos.push(...nombres);
+      alumnosAgregados += nombres.length;
+    });
+    let msg = `Listo: ${creados} grupo(s) nuevo(s), ${actualizados} actualizado(s), ${alumnosAgregados} alumno(s) agregados.`;
+    if(sinDetectar.length) msg += ` No se pudo interpretar: ${sinDetectar.join(', ')} — revísalas manualmente.`;
+    status.textContent = msg;
+    input.value='';
+    renderGrupos(); renderListadoGeneral(); renderMaestroGrupoChecklist();
+  }catch(err){ status.textContent = 'Error: ' + err.message; }
+}
+function toggleGrupoExpand(id){
+  const g = grupoById(id);
+  g.expanded = !g.expanded;
+  renderGrupos();
+}
+function renderGrupos(){
+  const el = document.getElementById('grupos-list');
+  if(!state.grupos.length){
+    el.innerHTML = `<div class="empty-state"><span class="icon">🗂️</span>Aún no has creado ningún grado ni grupo.</div>`;
+    return;
+  }
+  el.innerHTML = state.grupos.map(g => `
+    <div class="card">
+      <h2>${esc(g.label)} <span class="muted" style="font-weight:400;">— ${g.alumnos.length} alumno(s)</span>
+        <span style="float:right; display:flex; gap:8px;">
+          <button class="btn ghost small" onclick="toggleGrupoExpand('${g.id}')">${g.expanded ? '▲ Ocultar lista' : '▼ Ver / editar lista'}</button>
+          <button class="btn danger" onclick="deleteGrupo('${g.id}')">Eliminar grupo</button>
+        </span>
+      </h2>
+      ${g.expanded ? `
+        <div class="row">
+          <div>
+            <label class="field-label">Pegar lista (un nombre por línea)</label>
+            <textarea id="bulk-${g.id}" placeholder="Juan Pérez López&#10;María García Ruiz"></textarea>
+            <button class="btn ghost small" style="margin-top:8px;" onclick="addAlumnosBulk('${g.id}')">+ Agregar a la lista</button>
+          </div>
+          <div>
+            <label class="field-label">O adjuntar archivo (.csv / .txt / .xlsx)</label>
+            <div class="file-drop">Un nombre por línea, por fila, o columna "nombre" en Excel.<input type="file" id="file-${g.id}" accept=".csv,.txt,.xlsx,.xls"></div>
+            <button class="btn ghost small" style="margin-top:8px;" onclick="importAlumnosFile('${g.id}')">Importar archivo</button>
+          </div>
+        </div>
+        ${g.alumnos.length ? `<div class="group-detail">${g.alumnos.map((a,i)=>`
+          <div class="list-item"><span>${i+1}. ${esc(a)}</span><button class="btn danger" onclick="deleteAlumno('${g.id}',${i})">Quitar</button></div>`).join('')}</div>` : `<p class="muted" style="margin-top:10px;">Este grupo aún no tiene alumnos.</p>`}
+      ` : ''}
+    </div>
+  `).join('');
+}
+function renderListadoGeneral(){
+  const el = document.getElementById('listado-general-box');
+  const totalAlumnos = state.grupos.reduce((s,g)=>s+g.alumnos.length,0);
+  if(!state.grupos.length){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <div class="banner" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <span><strong>Machote generado automáticamente:</strong> ${state.grupos.length} grupo(s), ${totalAlumnos} alumno(s) en total — ${state.grupos.map(g=>esc(g.label)).join(', ')}.</span>
+      <button class="btn ghost small" onclick="exportListadoGeneralPDF()">⬇ Descargar listado general (PDF)</button>
+    </div>`;
+}
+function exportListadoGeneralPDF(){
+  if(!state.grupos.length){ alert('Aún no hay grupos con alumnos.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(22,33,62);
+  doc.text(state.settings.escuela || 'Listado general de grupos', 14, 20);
+  doc.setFontSize(10.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
+  doc.text(`Ciclo escolar ${state.settings.ciclo||''}`, 14, 27);
+  let y = 36;
+  state.grupos.forEach((g,i)=>{
+    if(y>250){ doc.addPage(); y=18; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(22,33,62);
+    doc.text(`Grupo ${g.label} — ${g.alumnos.length} alumno(s)`, 14, y); y+=4;
+    if(g.alumnos.length){
+      doc.autoTable({ startY:y, head:[['#','Nombre del alumno']], body:g.alumnos.map((a,j)=>[j+1,a]),
+        theme:'grid', styles:{fontSize:9.5, cellPadding:2.4}, headStyles:{fillColor:[22,33,62], textColor:255}, margin:{left:14,right:14} });
+      y = doc.lastAutoTable.finalY + 8;
+    } else { y += 8; }
+  });
+  doc.save('Listado_General_Escuela.pdf');
+}
+
+/* ============================= MAESTROS ============================= */
+function renderMaestroGrupoChecklist(){
+  const el = document.getElementById('maestro-grupos-checklist');
+  if(!state.grupos.length){ el.innerHTML = `<span class="muted">Primero da de alta grados y grupos arriba.</span>`; return; }
+  el.innerHTML = state.grupos.map(g=>`<label class="chk"><input type="checkbox" value="${g.id}" class="maestro-grupo-chk"> ${esc(g.label)}</label>`).join('');
+}
+function addMaestro(){
+  const nombre = document.getElementById('in-maestro-nombre').value.trim();
+  const materia = document.getElementById('in-maestro-materia').value.trim();
+  const grupoIds = Array.from(document.querySelectorAll('.maestro-grupo-chk:checked')).map(c=>c.value);
+  if(!nombre){ alert('Escribe el nombre del maestro.'); return; }
+  state.maestros.push({id:uid(), nombre, materia, grupoIds, horarioImagen:null});
+  document.getElementById('in-maestro-nombre').value=''; document.getElementById('in-maestro-materia').value='';
+  renderMaestroGrupoChecklist(); renderMaestros(); renderHorarioMaestroSelect();
+}
+function deleteMaestro(id){
+  if(!confirm('¿Eliminar a este docente?')) return;
+  state.maestros = state.maestros.filter(m=>m.id!==id);
+  state.documentos.forEach(d=> d.maestroIds = (d.maestroIds||[]).filter(mid=>mid!==id));
+  renderMaestros(); renderHorarioMaestroSelect();
+}
+
+/* ---- lectura de archivo (csv/txt/pdf/docx/imagen con OCR) ---- */
+async function extractTextFromFile(file){
+  const name = file.name.toLowerCase();
+  if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+    if(typeof XLSX === 'undefined') throw new Error('No se pudo cargar el lector de Excel (revisa tu conexión a internet).');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_csv(sheet);
+  }
+  if(name.endsWith('.csv') || name.endsWith('.txt')){
+    const text = await file.text();
+    if(looksLikeGarbage(text)) throw new Error('Este archivo no parece texto legible (¿es en realidad un .xlsx, .doc o una imagen renombrada?). Sube el formato correcto.');
+    return text;
+  }
+  if(name.endsWith('.pdf')){
+    if(typeof pdfjsLib === 'undefined') throw new Error('No se pudo cargar el lector de PDF (revisa tu conexión a internet).');
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let text = '';
+    for(let p=1;p<=pdf.numPages;p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      text += content.items.map(it=>it.str).join(' ') + '\n';
+    }
+    return text;
+  }
+  if(name.endsWith('.docx')){
+    if(typeof mammoth === 'undefined') throw new Error('No se pudo cargar el lector de Word (revisa tu conexión a internet).');
+    const buf = await file.arrayBuffer();
+    const res = await mammoth.extractRawText({arrayBuffer:buf});
+    return res.value;
+  }
+  if(name.match(/\.(png|jpe?g)$/)){
+    if(typeof Tesseract === 'undefined') throw new Error('No se pudo cargar el lector de imágenes OCR (revisa tu conexión a internet). Usa "Adjuntar horario (imagen)" en su lugar.');
+    const { data } = await Tesseract.recognize(file, 'spa');
+    return data.text;
+  }
+  throw new Error('Formato de archivo no soportado.');
+}
+
+let pendingMaestrosImport = [];
+async function leerArchivoMaestros(){
+  const input = document.getElementById('file-maestros');
+  const status = document.getElementById('import-maestros-status');
+  const file = input.files[0];
+  if(!file){ status.textContent='Selecciona un archivo primero.'; return; }
+  status.textContent = 'Leyendo archivo, un momento… (las imágenes y PDF escaneados tardan más por el OCR)';
+  try{
+    const text = await extractTextFromFile(file);
+    status.textContent = 'Texto detectado. Revísalo, corrígelo si hace falta y presiona "Interpretar líneas".';
+    const wrap = document.getElementById('maestros-import-preview');
+    wrap.innerHTML = `
+      <label class="field-label" style="margin-top:10px;">Texto detectado (formato sugerido por línea: nombre, materia, grupo1;grupo2)</label>
+      <textarea id="maestros-texto-detectado" style="min-height:120px; font-family:'IBM Plex Mono',monospace; font-size:12px;">${esc(text.trim())}</textarea>
+      <button class="btn ghost small" style="margin-top:8px;" onclick="parseMaestrosPreview()">Interpretar líneas</button>
+      <div id="maestros-preview-rows"></div>
+      <button class="btn gold small" id="btn-confirmar-import" style="display:none; margin-top:10px;" onclick="confirmarImportMaestros()">Confirmar e importar</button>
+    `;
+  }catch(err){
+    status.textContent = 'Error: ' + err.message;
+  }
+}
+function normalizeKey(s){
+  return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+}
+function parseMaestrosPreview(){
+  const raw = document.getElementById('maestros-texto-detectado').value;
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  pendingMaestrosImport = lines.map(line=>{
+    const parts = line.split(/\t|,/).map(p=>p.trim());
+    const nombre = parts[0] || '';
+    const materia = parts[1] || '';
+    const gruposRaw = parts.slice(2).join(',');
+    const tokens = gruposRaw.split(/;|\/| y /).map(s=>s.trim()).filter(Boolean);
+    const grupoIds = [];
+    tokens.forEach(tok=>{
+      const key = normalizeKey(tok);
+      if(!key) return;
+      const match = state.grupos.find(g => normalizeKey(g.label)===key);
+      if(match){ grupoIds.push(match.id); return; }
+      // coincidencia parcial (ej. el token trae texto extra alrededor del código de grupo)
+      const parcial = state.grupos.find(g => key.includes(normalizeKey(g.label)) && normalizeKey(g.label).length>=2);
+      if(parcial) grupoIds.push(parcial.id);
+    });
+    return {nombre, materia, grupoIds:[...new Set(grupoIds)]};
+  }).filter(r=>r.nombre);
+  renderMaestrosPreviewRows();
+  document.getElementById('btn-confirmar-import').style.display = pendingMaestrosImport.length ? 'inline-flex' : 'none';
+}
+function renderMaestrosPreviewRows(){
+  const el = document.getElementById('maestros-preview-rows');
+  if(!pendingMaestrosImport.length){ el.innerHTML = `<p class="muted">No se detectaron filas con nombre. Corrige el texto e inténtalo de nuevo.</p>`; return; }
+  el.innerHTML = pendingMaestrosImport.map((r,i)=>`
+    <div class="import-preview-row">
+      <div class="row">
+        <div><label class="field-label">Nombre</label><input type="text" value="${esc(r.nombre)}" oninput="pendingMaestrosImport[${i}].nombre=this.value"></div>
+        <div><label class="field-label">Materia</label><input type="text" value="${esc(r.materia)}" oninput="pendingMaestrosImport[${i}].materia=this.value"></div>
+      </div>
+      <label class="field-label" style="margin-top:8px;">Grupos</label>
+      <div class="checklist">
+        ${state.grupos.map(g=>`<label class="chk"><input type="checkbox" value="${g.id}" ${r.grupoIds.includes(g.id)?'checked':''} onchange="togglePendingGrupo(${i},'${g.id}',this.checked)"> ${esc(g.label)}</label>`).join('') || '<span class="muted">No hay grupos creados todavía.</span>'}
+      </div>
+      <button class="btn danger small" style="margin-top:8px;" onclick="removePendingRow(${i})">Quitar esta fila</button>
+    </div>
+  `).join('');
+}
+function togglePendingGrupo(i, gid, checked){
+  const r = pendingMaestrosImport[i];
+  if(checked){ if(!r.grupoIds.includes(gid)) r.grupoIds.push(gid); }
+  else { r.grupoIds = r.grupoIds.filter(id=>id!==gid); }
+}
+function removePendingRow(i){ pendingMaestrosImport.splice(i,1); renderMaestrosPreviewRows(); }
+function confirmarImportMaestros(){
+  pendingMaestrosImport.forEach(r=>{
+    if(!r.nombre) return;
+    state.maestros.push({id:uid(), nombre:r.nombre, materia:r.materia, grupoIds:r.grupoIds, horarioImagen:null});
+  });
+  document.getElementById('import-maestros-status').textContent = `Se importaron ${pendingMaestrosImport.length} docente(s).`;
+  pendingMaestrosImport = [];
+  document.getElementById('maestros-import-preview').innerHTML = '';
+  document.getElementById('file-maestros').value = '';
+  renderMaestros(); renderHorarioMaestroSelect();
+}
+
+/* ---- horario (imagen) por docente ---- */
+function renderHorarioMaestroSelect(){
+  const el = document.getElementById('in-horario-maestro');
+  if(!el) return;
+  if(!state.maestros.length){ el.innerHTML = `<option value="">— primero agrega un docente —</option>`; return; }
+  el.innerHTML = state.maestros.map(m=>`<option value="${m.id}">${esc(m.nombre)}</option>`).join('');
+}
+async function attachHorarioImagen(){
+  const maestroId = document.getElementById('in-horario-maestro').value;
+  const fileInput = document.getElementById('in-horario-file');
+  const file = fileInput.files[0];
+  const status = document.getElementById('horario-status');
+  if(!maestroId){ alert('Selecciona un docente.'); return; }
+  if(!file){ alert('Selecciona una imagen.'); return; }
+  status.textContent = 'Adjuntando imagen…';
+  try{
+    const img = await readImageForDataUrl(file);
+    const m = maestroById(maestroId);
+    m.horarioImagen = img;
+    renderMaestros();
+
+    if(typeof Tesseract === 'undefined'){
+      status.textContent = `Horario adjuntado a ${m.nombre}. (La lectura automática de grupos no está disponible ahora mismo; revisa tu conexión si quieres que se detecten solos.)`;
+      fileInput.value = '';
+      return;
+    }
+    status.textContent = `Horario adjuntado a ${m.nombre}. Buscando los grupos en la imagen (OCR)…`;
+    const { data } = await Tesseract.recognize(file, 'spa');
+    const textoNorm = normalizeKey(data.text);
+    const detectados = state.grupos.filter(g => normalizeKey(g.label).length>=2 && textoNorm.includes(normalizeKey(g.label)));
+    if(detectados.length){
+      const nuevos = detectados.filter(g=>!m.grupoIds.includes(g.id));
+      m.grupoIds = [...new Set([...m.grupoIds, ...detectados.map(g=>g.id)])];
+      renderMaestros();
+      status.textContent = `Horario adjuntado a ${m.nombre}. Grupos detectados y relacionados: ${detectados.map(g=>g.label).join(', ')}${nuevos.length ? '' : ' (ya los tenía asignados)'}. Verifica que sea correcto en la lista de abajo.`;
+    } else {
+      status.textContent = `Horario adjuntado a ${m.nombre}. No se pudo relacionar ningún grupo automáticamente desde la imagen; agrégalos manualmente si hace falta.`;
+    }
+    fileInput.value = '';
+  }catch(err){ status.textContent = 'Error: ' + err.message; }
+}
+function quitarHorario(maestroId){
+  maestroById(maestroId).horarioImagen = null;
+  renderMaestros();
+}
+function quitarGrupoDeMaestro(maestroId, grupoId){
+  const m = maestroById(maestroId);
+  m.grupoIds = m.grupoIds.filter(id=>id!==grupoId);
+  renderMaestros();
+}
+function renderMaestros(){
+  const el = document.getElementById('maestros-list');
+  if(!state.maestros.length){
+    el.innerHTML = `<div class="empty-state"><span class="icon">🧑‍🏫</span>Aún no has registrado ningún docente.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="card"><h2>Docentes registrados (${state.maestros.length})</h2>` +
+    state.maestros.map((m,i)=>`
+      <div class="list-item">
+        <div>
+          <strong>${i+1}. ${esc(m.nombre)}</strong>${m.materia ? ` <span class="muted">— ${esc(m.materia)}</span>` : ''}<br>
+          ${m.grupoIds.length ? m.grupoIds.map(gid=>{const g=grupoById(gid); return g?`<span class="pill">${esc(g.label)} <button onclick="quitarGrupoDeMaestro('${m.id}','${gid}')" title="Quitar este grupo" style="border:none; background:none; color:var(--red); cursor:pointer; font-weight:700; margin-left:3px; padding:0;">×</button></span>`:'';}).join('') : `<span class="muted">Sin grupos asignados</span>`}
+          ${m.horarioImagen ? `<br><span class="pill">📅 Horario adjunto</span> <button class="btn danger small" onclick="quitarHorario('${m.id}')">Quitar horario</button>` : ''}
+        </div>
+        <button class="btn danger" onclick="deleteMaestro('${m.id}')">Eliminar</button>
+      </div>
+    `).join('') + `</div>`;
+}
+
+/* ============================= DOCUMENTOS ============================= */
+function toggleDocMaestroChecklist(){
+  document.getElementById('doc-maestros-checklist-wrap').style.display = document.getElementById('in-doc-asignacion').value==='seleccion' ? 'block' : 'none';
+}
+function renderDocMaestroChecklist(){
+  const el = document.getElementById('doc-maestros-checklist');
+  if(!state.maestros.length){ el.innerHTML = `<span class="muted">Primero da de alta docentes.</span>`; return; }
+  el.innerHTML = state.maestros.map(m=>`<label class="chk"><input type="checkbox" value="${m.id}" class="doc-maestro-chk"> ${esc(m.nombre)}</label>`).join('');
+}
+async function readArchivoAdjunto(file){
+  if(!file) return null;
+  const name = file.name.toLowerCase();
+  if(name.match(/\.(png|jpe?g)$/)){
+    const img = await readImageForDataUrl(file);
+    return { kind:'imagen', dataUrl:img.dataUrl, tipo:img.tipo, ratio:img.ratio, nombreArchivo:file.name };
+  }
+  if(name.endsWith('.pdf')){
+    const bytes = await file.arrayBuffer();
+    return { kind:'pdf', bytes, nombreArchivo:file.name };
+  }
+  return { kind:'otro', nombreArchivo:file.name };
+}
+async function addDocumento(){
+  const nombre = document.getElementById('in-doc-nombre').value.trim();
+  const tipo = document.getElementById('in-doc-tipo').value;
+  const asignacion = document.getElementById('in-doc-asignacion').value;
+  const fileInput = document.getElementById('in-doc-file');
+  const file = fileInput.files[0] || null;
+  const maestroIds = asignacion==='seleccion' ? Array.from(document.querySelectorAll('.doc-maestro-chk:checked')).map(c=>c.value) : [];
+  if(!nombre){ alert('Escribe el nombre del documento.'); return; }
+  let archivo = null;
+  try{ archivo = await readArchivoAdjunto(file); }
+  catch(err){ alert('No se pudo leer el archivo adjunto: ' + err.message); }
+  state.documentos.push({id:uid(), nombre, tipo, asignacion, maestroIds, fileName: file?file.name:'', archivo});
+  document.getElementById('in-doc-nombre').value=''; fileInput.value='';
+  renderDocumentos(); renderDocumentosOrdenBoard();
+}
+function deleteDocumento(id){ state.documentos = state.documentos.filter(d=>d.id!==id); renderDocumentos(); renderDocumentosOrdenBoard(); }
+function docApplicableTo(doc, maestroId){ return doc.asignacion==='todos' || (doc.maestroIds||[]).includes(maestroId); }
+function renderDocumentos(){
+  const el = document.getElementById('documentos-list');
+  if(!state.documentos.length){ el.innerHTML = `<div class="empty-state"><span class="icon">📎</span>No has agregado documentos comunes todavía.</div>`; return; }
+  el.innerHTML = `<div class="card"><h2>Documentos compartidos (${state.documentos.length})</h2>` +
+    state.documentos.map(d=>`
+      <div class="list-item">
+        <div>
+          <strong>${esc(d.nombre)}</strong> <span class="pill">${esc(d.tipo)}</span><br>
+          <span class="muted">${d.asignacion==='todos' ? 'Para todos los docentes' : 'Para: ' + (d.maestroIds.map(id=>{const m=maestroById(id); return m?m.nombre:'';}).filter(Boolean).join(', ') || 'nadie seleccionado')}</span>
+          ${d.fileName ? `<br><span class="muted">Archivo: ${esc(d.fileName)} ${d.archivo && d.archivo.kind==='imagen' ? '— se incrusta como imagen en la agenda' : d.archivo && d.archivo.kind==='pdf' ? '— se anexa como páginas de PDF en la agenda' : '— formato no incrustable, solo se lista'}</span>` : ''}
+        </div>
+        <button class="btn danger" onclick="deleteDocumento('${d.id}')">Eliminar</button>
+      </div>
+    `).join('') + `</div>`;
+}
+
+/* ============================= PLANTILLA / MACHOTE VISUAL ============================= */
+function resetPlantilla(){
+  state.plantilla.texto = DEFAULT_PLANTILLA_TEXTO;
+  state.plantilla.orden = [...DEFAULT_ORDEN];
+  state.plantilla.mesesAsistencia = ['NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO'];
+  document.getElementById('in-plantilla').value = DEFAULT_PLANTILLA_TEXTO;
+  renderOrdenSecciones();
+  renderMesesAsistenciaChecklist();
+}
+function handlePlantillaImagen(inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  readImageForDataUrl(file).then(img=>{
+    state.plantilla.imagen = img;
+    renderPlantillaImagenPreview(); renderOrdenSecciones();
+  }).catch(err=>alert(err.message));
+}
+function quitarPlantillaImagen(){
+  state.plantilla.imagen = null;
+  document.getElementById('in-plantilla-imagen').value = '';
+  renderPlantillaImagenPreview(); renderOrdenSecciones();
+}
+function cambiarModoImagenPortada(modo){
+  state.plantilla.imagenModo = modo;
+  renderOrdenSecciones();
+}
+function toggleMesAsistencia(mes, checked){
+  const arr = state.plantilla.mesesAsistencia;
+  if(checked){ if(!arr.includes(mes)) arr.push(mes); }
+  else { state.plantilla.mesesAsistencia = arr.filter(m=>m!==mes); }
+  renderOrdenSecciones();
+}
+function renderMesesAsistenciaChecklist(){
+  const el = document.getElementById('meses-asistencia-checklist');
+  if(!el) return;
+  const sel = state.plantilla.mesesAsistencia || [];
+  el.innerHTML = CALENDARIO_MESES.map(m=>`
+    <label class="chk"><input type="checkbox" value="${m.mes}" ${sel.includes(m.mes)?'checked':''} onchange="toggleMesAsistencia('${m.mes}', this.checked)"> ${m.mes} <span class="muted">(${m.dias.length} días)</span></label>
+  `).join('');
+}
+function renderPlantillaImagenPreview(){
+  const el = document.getElementById('plantilla-imagen-preview');
+  if(!state.plantilla.imagen){ el.innerHTML = `<span class="muted">Sin imagen de ejemplo cargada todavía.</span>`; return; }
+  el.innerHTML = `<img src="${state.plantilla.imagen.dataUrl}" style="max-width:100%; border:1px solid var(--line); border-radius:5px; display:block; margin-bottom:8px;">
+    <button class="btn danger" onclick="quitarPlantillaImagen()">Quitar imagen</button>`;
+}
+
+function thumbVisual(id){
+  if(id==='portada'){
+    if(state.plantilla.imagen) return `<div class="thumb-visual" style="background-image:url('${state.plantilla.imagen.dataUrl}');"></div>`;
+    return `<div class="thumb-visual"><div class="mini-lines" style="width:100%;"><span></span><span></span><span></span></div></div>`;
+  }
+  if(id==='horario') return `<div class="thumb-visual"><span class="mini-icon">🗓️</span></div>`;
+  if(id==='grupos') return `<div class="thumb-visual"><div class="mini-table"><div class="r"><div class="c"></div><div class="c"></div></div><div class="r"><div class="c"></div><div class="c"></div></div><div class="r"><div class="c"></div><div class="c"></div></div><div class="r"><div class="c"></div><div class="c"></div></div></div></div>`;
+  if(id==='asistencia') return `<div class="thumb-visual"><span class="mini-icon">✅</span></div>`;
+  if(id==='documentos') return `<div class="thumb-visual"><span class="mini-icon">📎</span></div>`;
+  if(id==='notas') return `<div class="thumb-visual"><div class="mini-ruled"></div></div>`;
+  return `<div class="thumb-visual"></div>`;
+}
+let dragSrcId = null;
+function onCardDragStart(e, id){ dragSrcId = id; e.dataTransfer.effectAllowed = 'move'; }
+function onCardDragOver(e, id){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onCardDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+function onCardDrop(e, targetId){
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  if(!dragSrcId || dragSrcId===targetId) return;
+  const orden = state.plantilla.orden;
+  const from = orden.indexOf(dragSrcId), to = orden.indexOf(targetId);
+  if(from<0 || to<0) return;
+  orden.splice(from,1); orden.splice(to,0,dragSrcId);
+  dragSrcId = null; renderOrdenSecciones();
+}
+function moveSeccion(index, dir){
+  const orden = state.plantilla.orden;
+  const j = index + dir;
+  if(j<0 || j>=orden.length) return;
+  [orden[index], orden[j]] = [orden[j], orden[index]];
+  renderOrdenSecciones();
+}
+function renderOrdenSecciones(){
+  const el = document.getElementById('orden-secciones-board');
+  el.innerHTML = state.plantilla.orden.map((id,i)=>`
+    <div class="page-thumb" draggable="true"
+         ondragstart="onCardDragStart(event,'${id}')"
+         ondragover="onCardDragOver(event,'${id}')"
+         ondragleave="onCardDragLeave(event)"
+         ondrop="onCardDrop(event,'${id}')">
+      <span class="badge-num">${i+1}</span>
+      <button class="btn danger" style="position:absolute; top:-8px; right:-8px; padding:1px 6px; font-size:11px; border-radius:50%;" title="Quitar esta hoja del orden" onclick="quitarSeccionDelOrden(${i})">×</button>
+      ${thumbVisual(id)}
+      <div class="thumb-label">${esc(SECTION_LABELS[id])}</div>
+      <div class="thumb-note">${esc(SECTION_NOTES[id])}</div>
+      <div class="mini-btns">
+        <button class="btn ghost small" style="padding:3px 7px; font-size:11px;" ${i===0?'disabled':''} onclick="moveSeccion(${i},-1)">↑</button>
+        <button class="btn ghost small" style="padding:3px 7px; font-size:11px;" ${i===state.plantilla.orden.length-1?'disabled':''} onclick="moveSeccion(${i},1)">↓</button>
+      </div>
+    </div>
+  `).join('');
+  renderAgregarSeccionSelect();
+}
+function quitarSeccionDelOrden(index){
+  state.plantilla.orden.splice(index,1);
+  renderOrdenSecciones();
+}
+function renderAgregarSeccionSelect(){
+  const wrap = document.getElementById('agregar-seccion-wrap');
+  const select = document.getElementById('in-seccion-agregar');
+  if(!wrap || !select) return;
+  const disponibles = Object.keys(SECTION_LABELS).filter(id => !state.plantilla.orden.includes(id));
+  if(!disponibles.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  select.innerHTML = disponibles.map(id=>`<option value="${id}">${esc(SECTION_LABELS[id])}</option>`).join('');
+}
+function agregarSeccionOpcional(){
+  const id = document.getElementById('in-seccion-agregar').value;
+  if(!id || state.plantilla.orden.includes(id)) return;
+  state.plantilla.orden.push(id);
+  renderOrdenSecciones();
+}
+
+/* ---- orden de documentos individuales (arrastre) ---- */
+let dragDocId = null;
+function onDocDragStart(e, id){ dragDocId = id; e.dataTransfer.effectAllowed = 'move'; }
+function onDocDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDocDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+function onDocDrop(e, targetId){
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  if(!dragDocId || dragDocId===targetId) return;
+  const arr = state.documentos;
+  const from = arr.findIndex(d=>d.id===dragDocId), to = arr.findIndex(d=>d.id===targetId);
+  if(from<0 || to<0) return;
+  const [item] = arr.splice(from,1);
+  arr.splice(to,0,item);
+  dragDocId = null; renderDocumentosOrdenBoard();
+}
+function moveDocumento(index, dir){
+  const arr = state.documentos;
+  const j = index + dir;
+  if(j<0 || j>=arr.length) return;
+  [arr[index], arr[j]] = [arr[j], arr[index]];
+  renderDocumentosOrdenBoard();
+}
+function documentoThumbVisual(d){
+  if(d.archivo && d.archivo.kind==='imagen') return `<div class="thumb-visual" style="background-image:url('${d.archivo.dataUrl}');"></div>`;
+  if(d.archivo && d.archivo.kind==='pdf') return `<div class="thumb-visual"><span class="mini-icon">📄</span></div>`;
+  return `<div class="thumb-visual"><span class="mini-icon">📎</span></div>`;
+}
+function renderDocumentosOrdenBoard(){
+  const wrap = document.getElementById('documentos-orden-wrap');
+  const board = document.getElementById('documentos-orden-board');
+  if(!wrap || !board) return;
+  if(!state.documentos.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  board.innerHTML = state.documentos.map((d,i)=>`
+    <div class="page-thumb" draggable="true"
+         ondragstart="onDocDragStart(event,'${d.id}')"
+         ondragover="onDocDragOver(event)"
+         ondragleave="onDocDragLeave(event)"
+         ondrop="onDocDrop(event,'${d.id}')">
+      <span class="badge-num">${i+1}</span>
+      ${documentoThumbVisual(d)}
+      <div class="thumb-label">${esc(d.nombre)}</div>
+      <div class="thumb-note">${esc(d.tipo)}</div>
+      <div class="mini-btns">
+        <button class="btn ghost small" style="padding:3px 7px; font-size:11px;" ${i===0?'disabled':''} onclick="moveDocumento(${i},-1)">↑</button>
+        <button class="btn ghost small" style="padding:3px 7px; font-size:11px;" ${i===state.documentos.length-1?'disabled':''} onclick="moveDocumento(${i},1)">↓</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ============================= AGENDAS ============================= */
+function buildAgendaData(){
+  return state.maestros.map((m, idx) => {
+    const grupos = m.grupoIds.map(gid=>grupoById(gid)).filter(Boolean);
+    const documentos = state.documentos.filter(d=>docApplicableTo(d, m.id));
+    const numero = String(idx+1).padStart(2,'0');
+    const portada = state.plantilla.texto
+      .replaceAll('{numero}', numero)
+      .replaceAll('{docente}', m.nombre)
+      .replaceAll('{materia}', m.materia || '—')
+      .replaceAll('{grupos}', grupos.map(g=>g.label).join(', ') || '—')
+      .replaceAll('{escuela}', state.settings.escuela || '')
+      .replaceAll('{ciclo}', state.settings.ciclo || '')
+      .replaceAll('{cct}', state.settings.cct || '')
+      .replaceAll('{turno}', state.settings.turno || '');
+    return {numero, maestro:m, grupos, documentos, portada};
+  });
+}
+function renderAgendasPanel(){
+  const data = buildAgendaData();
+  const summary = document.getElementById('agendas-summary');
+  const list = document.getElementById('agendas-list');
+  if(!data.length){
+    summary.style.display='none';
+    list.innerHTML = `<div class="empty-state"><span class="icon">📒</span>Todavía no hay docentes registrados. Ve a la pestaña Grupos y Maestros para agregarlos.</div>`;
+    return;
+  }
+  summary.style.display='block';
+  summary.textContent = `${data.length} agenda(s) lista(s) para descargar · numeración consecutiva 01–${data[data.length-1].numero}. El machote y su orden se reutilizan automáticamente para cada docente.`;
+  list.innerHTML = data.map(a => `
+    <div class="agenda-card">
+      <div class="top">
+        <div>
+          <div class="num-badge">DOCENTE N.° ${a.numero}</div>
+          <h3>${esc(a.maestro.nombre)}</h3>
+          <span class="muted">${esc(a.maestro.materia||'Sin materia asignada')} · ${a.grupos.length} grupo(s) · ${a.documentos.length} documento(s) comunes${a.maestro.horarioImagen ? ' · con horario' : ''}</span><br>
+          ${a.grupos.map(g=>`<span class="pill">${esc(g.label)} (${g.alumnos.length})</span>`).join('') || '<span class="muted">Sin grupos asignados</span>'}
+        </div>
+        <div class="actions">
+          <button class="btn ghost small" onclick="exportPDFIndividual('${a.maestro.id}')">⬇ PDF individual</button>
+          <button class="btn ghost small" onclick="exportDocIndividual('${a.maestro.id}')">⬇ Word (.doc)</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---- PDF ---- */
+function pdfEnsureSpace(doc, y, minNeeded){ if(y + minNeeded > 270){ doc.addPage(); return 18; } return y; }
+function pdfSeccionPortada(doc, a, y){
+  const img = state.plantilla.imagen;
+  if(img){
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    // "cover": llenar toda la hoja manteniendo proporción, recortando el sobrante
+    let drawW = pageW, drawH = pageW * img.ratio;
+    if(drawH < pageH){ drawH = pageH; drawW = pageH / img.ratio; }
+    const offsetX = (pageW - drawW) / 2, offsetY = (pageH - drawH) / 2;
+    doc.addImage(img.dataUrl, img.tipo, offsetX, offsetY, drawW, drawH);
+
+    if(state.plantilla.imagenModo === 'fondo'){
+      const lines = doc.splitTextToSize(a.portada, pageW - 44);
+      const boxH = Math.min(lines.length*5.6 + 18, pageH - 28);
+      const boxY = pageH - boxH - 14;
+      let opacidadOk = false;
+      try{
+        const GState = doc.GState || (window.jspdf && window.jspdf.GState);
+        if(GState){ doc.setGState(new GState({opacity:0.88})); opacidadOk = true; }
+      }catch(e){}
+      doc.setFillColor(255,255,255);
+      doc.roundedRect(14, boxY, pageW-28, boxH, 3, 3, 'F');
+      if(opacidadOk){ try{ const GState = doc.GState || (window.jspdf && window.jspdf.GState); doc.setGState(new GState({opacity:1})); }catch(e){} }
+      doc.setTextColor(20,25,40); doc.setFontSize(11); doc.setFont('helvetica','normal');
+      doc.text(lines, 22, boxY + 10);
+    }
+    // esta hoja quedó a página completa; el resto de secciones continúan en una hoja nueva
+    doc.addPage();
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(90,90,90);
+    doc.text(`AGENDA ESCOLAR — USO DE DIRECCIÓN · N.° ${a.numero}`, 14, 14);
+    doc.setDrawColor(200,155,60); doc.setLineWidth(0.6); doc.line(14,17,196,17);
+    return 24;
+  }
+  // sin imagen cargada: portada de solo texto, como antes
+  doc.setTextColor(20,25,40); doc.setFontSize(11); doc.setFont('helvetica','normal');
+  const lines = doc.splitTextToSize(a.portada, 182);
+  y = pdfEnsureSpace(doc, y, lines.length*5.4);
+  doc.text(lines, 14, y+4);
+  return y + lines.length*5.4 + 8;
+}
+function pdfSeccionHorario(doc, a, y){
+  if(!a.maestro.horarioImagen) return y;
+  const img = a.maestro.horarioImagen;
+  const w = 170, h = w * img.ratio;
+  y = pdfEnsureSpace(doc, y, 16);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(22,33,62);
+  doc.text('Horario del docente', 14, y); y += 4;
+  y = pdfEnsureSpace(doc, y, Math.min(h,150)+4);
+  doc.addImage(img.dataUrl, img.tipo, 14, y, w, Math.min(h,150));
+  return y + Math.min(h,150) + 8;
+}
+function pdfSeccionGrupos(doc, a, y){
+  a.grupos.forEach(g=>{
+    y = pdfEnsureSpace(doc, y, 18);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(22,33,62);
+    doc.text(`Grupo ${g.label} — ${g.alumnos.length} alumno(s)`, 14, y); y += 4;
+    if(g.alumnos.length){
+      doc.autoTable({ startY:y, head:[['#','Nombre del alumno']], body:g.alumnos.map((al,i)=>[i+1,al]),
+        theme:'grid', styles:{fontSize:9.5, cellPadding:2.4}, headStyles:{fillColor:[22,33,62], textColor:255}, margin:{left:14,right:14} });
+      y = doc.lastAutoTable.finalY + 8;
+    } else {
+      doc.setFont('helvetica','italic'); doc.setFontSize(9.5); doc.setTextColor(120,120,120);
+      doc.text('Sin alumnos registrados todavía.', 14, y+4); y += 12;
+    }
+  });
+  return y;
+}
+function pdfSeccionDocumentos(doc, a, y){
+  if(!a.documentos.length) return y;
+  y = pdfEnsureSpace(doc, y, 20);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(22,33,62);
+  doc.text('Documentos y acuerdos comunes asignados', 14, y); y += 4;
+  doc.autoTable({ startY:y, head:[['Documento','Tipo','Nota']],
+    body: a.documentos.map(d=>[d.nombre, d.tipo,
+      d.archivo && d.archivo.kind==='imagen' ? 'Imagen incrustada abajo' :
+      d.archivo && d.archivo.kind==='pdf' ? 'PDF anexado al final de esta agenda' :
+      d.archivo && d.archivo.kind==='otro' ? `Archivo: ${d.archivo.nombreArchivo} (ábrelo aparte)` : '—']),
+    theme:'grid', styles:{fontSize:9.5, cellPadding:2.4}, headStyles:{fillColor:[200,155,60], textColor:[36,27,4]}, margin:{left:14,right:14} });
+  y = doc.lastAutoTable.finalY + 8;
+  a.documentos.forEach(d=>{
+    if(!d.archivo || d.archivo.kind!=='imagen') return;
+    const w = 120, h = w * d.archivo.ratio;
+    y = pdfEnsureSpace(doc, y, 14);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(22,33,62);
+    doc.text(d.nombre || '', 14, y); y += 4;
+    y = pdfEnsureSpace(doc, y, Math.min(h,140)+4);
+    doc.addImage(d.archivo.dataUrl, d.archivo.tipo, 14, y, w, Math.min(h,140));
+    y += Math.min(h,140) + 8;
+  });
+  return y;
+}
+const TRIMESTRE_DE_MES = {
+  AGOSTO:'PRIMER TRIMESTRE', SEPTIEMBRE:'PRIMER TRIMESTRE', OCTUBRE:'PRIMER TRIMESTRE',
+  NOVIEMBRE:'SEGUNDO TRIMESTRE', DICIEMBRE:'SEGUNDO TRIMESTRE', ENERO:'SEGUNDO TRIMESTRE', FEBRERO:'SEGUNDO TRIMESTRE',
+  MARZO:'TERCER TRIMESTRE', ABRIL:'TERCER TRIMESTRE', MAYO:'TERCER TRIMESTRE', JUNIO:'TERCER TRIMESTRE', JULIO:'TERCER TRIMESTRE',
+};
+const MESES_SEGUNDO_ANIO_CICLO = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO'];
+function anioDeMes(mes){
+  const partes = (state.settings.ciclo||'').split(/[-–]/).map(s=>s.trim());
+  if(partes.length<2) return '';
+  return MESES_SEGUNDO_ANIO_CICLO.includes(mes) ? partes[1] : partes[0];
+}
+const NUM_COLUMNAS_TRABAJOS = 8;
+/** Mezcla el listado de alumnos de cada grupo con el calendario oficial, respetando el formato
+ *  de la "Lista guía": encabezado de escuela/CCT/ciclo+turno, fila GRUPO·TRIMESTRE·MES, cuadrícula
+ *  de días de ese mes y bloque de TRABAJOS — todo en UNA sola hoja horizontal por grupo y mes. */
+function pdfSeccionAsistencia(doc, a, y){
+  const mesesSel = state.plantilla.mesesAsistencia || [];
+  if(!mesesSel.length || !a.grupos.length) return y;
+  a.grupos.forEach(g=>{
+    CALENDARIO_MESES.filter(m=>mesesSel.includes(m.mes)).forEach(mesInfo=>{
+      doc.addPage('a4','landscape');
+      const pageW = doc.internal.pageSize.getWidth();
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(30,30,30);
+      doc.text(state.settings.escuela || '', pageW/2, 8, {align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      doc.text(`C.C.T. ${state.settings.cct||''}`, pageW/2, 12.5, {align:'center'});
+      doc.text(`CICLO ESCOLAR ${state.settings.ciclo||''}   ·   TURNO ${state.settings.turno||''}`, pageW/2, 16.5, {align:'center'});
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(22,33,62);
+      doc.text(`GRUPO: ${g.label}`, 10, 24);
+      doc.setFontSize(11); doc.setTextColor(90,90,90);
+      doc.text(TRIMESTRE_DE_MES[mesInfo.mes] || '', pageW/2, 24, {align:'center'});
+      doc.text(`${mesInfo.mes} ${anioDeMes(mesInfo.mes)}`.trim(), pageW-10, 24, {align:'right'});
+
+      const nAlumnos = g.alumnos.length || 1;
+      let fs = 7, pad = 1.3;
+      if(nAlumnos > 25){ fs = 6.2; pad = 0.9; }
+      if(nAlumnos > 35){ fs = 5.4; pad = 0.6; }
+      const anchoDia = 6, anchoTrabajo = 6;
+
+      const head = [
+        ['N/L','NOMBRE DEL ESTUDIANTE', ...mesInfo.dias.map(d=>d.l), ...Array(NUM_COLUMNAS_TRABAJOS).fill('')],
+        ['','', ...mesInfo.dias.map(d=>String(d.n)), ...Array(NUM_COLUMNAS_TRABAJOS).fill('')]
+      ];
+      const body = (g.alumnos.length ? g.alumnos : ['Sin alumnos registrados']).map((al,i)=>[
+        g.alumnos.length ? i+1 : '', al, ...mesInfo.dias.map(()=>''), ...Array(NUM_COLUMNAS_TRABAJOS).fill('')
+      ]);
+      const columnStyles = {0:{cellWidth:8}, 1:{cellWidth:46}};
+      mesInfo.dias.forEach((d,idx)=>{ columnStyles[idx+2] = {cellWidth:anchoDia, halign:'center'}; });
+      for(let t=0;t<NUM_COLUMNAS_TRABAJOS;t++){ columnStyles[2+mesInfo.dias.length+t] = {cellWidth:anchoTrabajo, halign:'center'}; }
+
+      const xInicioTrabajos = 10 + 8 + 46 + mesInfo.dias.length*anchoDia;
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(22,33,62);
+      doc.text('TRABAJOS', xInicioTrabajos + (NUM_COLUMNAS_TRABAJOS*anchoTrabajo)/2, 27, {align:'center'});
+
+      doc.autoTable({
+        startY:29, head, body, theme:'grid',
+        styles:{fontSize:fs, cellPadding:pad},
+        headStyles:{fillColor:[22,33,62], textColor:255, fontSize:fs},
+        columnStyles, margin:{left:10,right:10},
+      });
+    });
+  });
+  doc.addPage('a4','portrait');
+  return 18;
+}
+function pdfSeccionNotas(doc, a, y){
+  y = pdfEnsureSpace(doc, y, 46);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(22,33,62);
+  doc.text('Notas y ajustes manuales:', 14, y);
+  doc.setDrawColor(217,207,174);
+  for(let i=1;i<=6;i++){ doc.line(14, y+6*i+2, 196, y+6*i+2); }
+  return y + 6*6 + 10;
+}
+const PDF_SECTION_FN = { portada:pdfSeccionPortada, horario:pdfSeccionHorario, grupos:pdfSeccionGrupos, asistencia:pdfSeccionAsistencia, documentos:pdfSeccionDocumentos, notas:pdfSeccionNotas };
+function drawAgendaIntoDoc(doc, a, isFirstPage){
+  if(!isFirstPage) doc.addPage();
+  const portadaAPaginaCompleta = state.plantilla.orden[0]==='portada' && !!state.plantilla.imagen;
+  if(!portadaAPaginaCompleta){
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(90,90,90);
+    doc.text(`AGENDA ESCOLAR — USO DE DIRECCIÓN · N.° ${a.numero}`, 14, 14);
+    doc.setDrawColor(200,155,60); doc.setLineWidth(0.6); doc.line(14,17,196,17);
+  }
+  let y = portadaAPaginaCompleta ? 0 : 24;
+  state.plantilla.orden.forEach(id => { y = PDF_SECTION_FN[id](doc, a, y); });
+}
+/** Anexa al final del PDF las páginas reales de los documentos en PDF que tenga asignados ese docente,
+ *  en el orden configurado. Requiere pdf-lib; si no está disponible, se omite silenciosamente (ya quedó
+ *  la nota "PDF anexado al final" en la tabla, así que se avisa al usuario por si acaso). */
+async function anexarPdfsAdjuntos(pdfLibDoc, documentos){
+  if(typeof PDFLib === 'undefined') return false;
+  const { PDFDocument } = PDFLib;
+  let anexado = false;
+  for(const d of documentos){
+    if(!d.archivo || d.archivo.kind!=='pdf') continue;
+    try{
+      const attDoc = await PDFDocument.load(d.archivo.bytes.slice(0));
+      const pages = await pdfLibDoc.copyPages(attDoc, attDoc.getPageIndices());
+      pages.forEach(p=>pdfLibDoc.addPage(p));
+      anexado = true;
+    }catch(err){ console.warn('No se pudo anexar el PDF', d.nombre, err); }
+  }
+  return anexado;
+}
+async function exportPDFIndividual(maestroId){
+  const data = buildAgendaData();
+  const a = data.find(x=>x.maestro.id===maestroId);
+  if(!a) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  drawAgendaIntoDoc(doc, a, true);
+  const tienePdfsAdjuntos = a.documentos.some(d=>d.archivo && d.archivo.kind==='pdf');
+  if(tienePdfsAdjuntos && typeof PDFLib !== 'undefined'){
+    const { PDFDocument } = PDFLib;
+    const finalDoc = await PDFDocument.load(doc.output('arraybuffer'));
+    await anexarPdfsAdjuntos(finalDoc, a.documentos);
+    const bytes = await finalDoc.save();
+    download(`Agenda_${a.numero}_${a.maestro.nombre.replace(/\s+/g,'_')}.pdf`, new Blob([bytes], {type:'application/pdf'}));
+  } else {
+    if(tienePdfsAdjuntos) alert('No se pudo cargar el motor para anexar PDF (revisa tu conexión); se descarga solo con la referencia en la tabla.');
+    doc.save(`Agenda_${a.numero}_${a.maestro.nombre.replace(/\s+/g,'_')}.pdf`);
+  }
+}
+async function exportPDFTodas(){
+  const data = buildAgendaData();
+  if(!data.length){ alert('Primero registra al menos un docente.'); return; }
+  const { jsPDF } = window.jspdf;
+  const indexDoc = new jsPDF();
+  indexDoc.setFont('helvetica','bold'); indexDoc.setFontSize(16); indexDoc.setTextColor(22,33,62);
+  indexDoc.text(state.settings.escuela || 'Agendas escolares', 14, 20);
+  indexDoc.setFontSize(11); indexDoc.setFont('helvetica','normal'); indexDoc.setTextColor(90,90,90);
+  indexDoc.text(`Ciclo escolar ${state.settings.ciclo||''} · Índice de docentes en orden ascendente`, 14, 27);
+  indexDoc.autoTable({ startY:34, head:[['N.°','Docente','Materia','Grupos']],
+    body: data.map(a=>[a.numero, a.maestro.nombre, a.maestro.materia||'—', a.grupos.map(g=>g.label).join(', ')||'—']),
+    theme:'grid', headStyles:{fillColor:[22,33,62]}, styles:{fontSize:9.5} });
+
+  const hayPdfsAdjuntos = data.some(a=>a.documentos.some(d=>d.archivo && d.archivo.kind==='pdf'));
+  if(typeof PDFLib === 'undefined'){
+    // sin pdf-lib: un solo documento jsPDF continuo (sin poder anexar páginas de PDF ajenas)
+    const doc = indexDoc;
+    data.forEach(a => drawAgendaIntoDoc(doc, a, false));
+    if(hayPdfsAdjuntos) alert('No se pudo cargar el motor para anexar PDF (revisa tu conexión); se descarga solo con la referencia en la tabla de cada docente.');
+    doc.save('Agendas_Escolares_Clasificadas.pdf');
+    return;
+  }
+  const { PDFDocument } = PDFLib;
+  const finalDoc = await PDFDocument.load(indexDoc.output('arraybuffer'));
+  for(const a of data){
+    const tdoc = new jsPDF();
+    drawAgendaIntoDoc(tdoc, a, true);
+    const tLib = await PDFDocument.load(tdoc.output('arraybuffer'));
+    const pages = await finalDoc.copyPages(tLib, tLib.getPageIndices());
+    pages.forEach(p=>finalDoc.addPage(p));
+    await anexarPdfsAdjuntos(finalDoc, a.documentos);
+  }
+  const bytes = await finalDoc.save();
+  download('Agendas_Escolares_Clasificadas.pdf', new Blob([bytes], {type:'application/pdf'}));
+}
+
+/* ---- Word (.doc) ---- */
+function htmlSeccionPortada(a){
+  const img = state.plantilla.imagen;
+  if(img){
+    if(state.plantilla.imagenModo === 'completa'){
+      return `<div style="page-break-after:always; margin:0; padding:0;"><img src="${img.dataUrl}" style="width:100%; height:100%; object-fit:cover; display:block;"></div>`;
+    }
+    return `<div style="position:relative; width:100%; min-height:820px; page-break-after:always;">
+      <img src="${img.dataUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0;">
+      <div style="position:absolute; left:26px; right:26px; bottom:26px; background:rgba(255,255,255,0.9); padding:16px 20px; border-radius:6px; z-index:1;">
+        <pre style="white-space:pre-wrap; font-family:Calibri,Arial,sans-serif; font-size:11pt; margin:0;">${esc(a.portada)}</pre>
+      </div>
+    </div>`;
+  }
+  return `<pre style="white-space:pre-wrap; font-family:Calibri,Arial,sans-serif; font-size:11pt;">${esc(a.portada)}</pre>`;
+}
+function htmlSeccionHorario(a){
+  if(!a.maestro.horarioImagen) return '';
+  return `<h3 style="color:#16213E;">Horario del docente</h3><img src="${a.maestro.horarioImagen.dataUrl}" style="max-width:500px; display:block;">`;
+}
+function htmlSeccionGrupos(a){
+  return a.grupos.map(g=>`
+    <h3 style="color:#16213E;">Grupo ${esc(g.label)} — ${g.alumnos.length} alumno(s)</h3>
+    <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse; width:100%; font-size:10.5pt;">
+      <tr style="background:#16213E; color:#fff;"><th>#</th><th>Nombre del alumno</th></tr>
+      ${g.alumnos.map((al,i)=>`<tr><td>${i+1}</td><td>${esc(al)}</td></tr>`).join('') || '<tr><td colspan="2"><i>Sin alumnos registrados.</i></td></tr>'}
+    </table><br>`).join('');
+}
+function htmlSeccionDocumentos(a){
+  if(!a.documentos.length) return '';
+  return `<h3 style="color:#16213E;">Documentos y acuerdos comunes asignados</h3>
+    <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse; width:100%; font-size:10.5pt;">
+      <tr style="background:#C89B3C;"><th>Documento</th><th>Tipo</th></tr>
+      ${a.documentos.map(d=>`<tr><td>${esc(d.nombre)}</td><td>${esc(d.tipo)}</td></tr>`).join('')}
+    </table>
+    ${a.documentos.map(d=>{
+      if(d.archivo && d.archivo.kind==='imagen') return `<p><strong>${esc(d.nombre)}</strong></p><img src="${d.archivo.dataUrl}" style="max-width:450px; display:block; margin-bottom:10px;">`;
+      if(d.archivo && d.archivo.kind==='pdf') return `<p>📄 <strong>${esc(d.nombre)}</strong> — archivo PDF adjunto (<em>${esc(d.archivo.nombreArchivo)}</em>): Word no puede incrustar páginas de PDF; ábrelo por separado y anéxalo al imprimir, o usa la descarga en PDF de la agenda, que sí lo incluye completo.</p>`;
+      if(d.archivo && d.archivo.kind==='otro') return `<p>📎 <strong>${esc(d.nombre)}</strong> — archivo adjunto: <em>${esc(d.archivo.nombreArchivo)}</em> (formato no incrustable, ábrelo por separado).</p>`;
+      return '';
+    }).join('')}`;
+}
+function htmlSeccionAsistencia(a){
+  const mesesSel = state.plantilla.mesesAsistencia || [];
+  if(!mesesSel.length || !a.grupos.length) return '';
+  const numTrabajos = NUM_COLUMNAS_TRABAJOS;
+  return a.grupos.map(g=>
+    CALENDARIO_MESES.filter(m=>mesesSel.includes(m.mes)).map(mesInfo=>`
+      <div style="text-align:center; font-size:8pt; color:#333;">
+        <strong style="font-size:10pt;">${esc(state.settings.escuela||'')}</strong><br>
+        C.C.T. ${esc(state.settings.cct||'')}<br>
+        CICLO ESCOLAR ${esc(state.settings.ciclo||'')} &nbsp;·&nbsp; TURNO ${esc(state.settings.turno||'')}
+      </div>
+      <table style="width:100%; border:none; margin-top:8px;"><tr>
+        <td style="text-align:left; font-size:13pt; font-weight:bold; color:#16213E; border:none;">GRUPO: ${esc(g.label)}</td>
+        <td style="text-align:center; font-size:11pt; color:#666; border:none;">${TRIMESTRE_DE_MES[mesInfo.mes]||''}</td>
+        <td style="text-align:right; font-size:11pt; color:#666; border:none;">${mesInfo.mes} ${anioDeMes(mesInfo.mes)}</td>
+      </tr></table>
+      <p style="font-size:8pt; color:#666; margin-top:14px;">Sugerencia: imprime esta página en orientación horizontal; cabe en una sola hoja.</p>
+      <table border="1" cellspacing="0" cellpadding="2" style="border-collapse:collapse; font-size:7.5pt;">
+        <tr style="background:#16213E; color:#fff;"><th>N/L</th><th>NOMBRE DEL ESTUDIANTE</th>${mesInfo.dias.map(d=>`<th>${d.l}</th>`).join('')}<th colspan="${numTrabajos}">TRABAJOS</th></tr>
+        <tr><td></td><td></td>${mesInfo.dias.map(d=>`<td style="text-align:center;">${d.n}</td>`).join('')}${Array(numTrabajos).fill('<td></td>').join('')}</tr>
+        ${(g.alumnos.length ? g.alumnos : ['Sin alumnos registrados']).map((al,i)=>`<tr><td>${g.alumnos.length?i+1:''}</td><td>${esc(al)}</td>${mesInfo.dias.map(()=>'<td>&nbsp;</td>').join('')}${Array(numTrabajos).fill('<td>&nbsp;</td>').join('')}</tr>`).join('')}
+      </table>
+      <br>`).join('')
+  ).join('');
+}
+function htmlSeccionNotas(){
+  return `<h3 style="color:#16213E;">Notas y ajustes manuales</h3><p>${'_'.repeat(90)}<br>${'_'.repeat(90)}<br>${'_'.repeat(90)}<br>${'_'.repeat(90)}<br>${'_'.repeat(90)}</p>`;
+}
+const HTML_SECTION_FN = { portada:htmlSeccionPortada, horario:htmlSeccionHorario, grupos:htmlSeccionGrupos, asistencia:htmlSeccionAsistencia, documentos:htmlSeccionDocumentos, notas:htmlSeccionNotas };
+function agendaHtmlBlock(a){
+  const cuerpo = state.plantilla.orden.map(id => HTML_SECTION_FN[id](a)).join('\n');
+  return `<div style="page-break-after:always; font-family:Calibri,Arial,sans-serif;">
+    <p style="color:#666; font-size:10pt; letter-spacing:1px;">AGENDA ESCOLAR — USO DE DIRECCIÓN · N.° ${a.numero}</p>
+    <hr style="border:1px solid #C89B3C;">
+    ${cuerpo}
+  </div>`;
+}
+function wrapWordDoc(bodyHtml){
+  return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+  <head><meta charset="utf-8"><title>Agenda</title></head><body>${bodyHtml}</body></html>`;
+}
+function exportDocIndividual(maestroId){
+  const data = buildAgendaData();
+  const a = data.find(x=>x.maestro.id===maestroId);
+  if(!a) return;
+  const blob = new Blob(['\ufeff', wrapWordDoc(agendaHtmlBlock(a))], {type:'application/msword'});
+  download(`Agenda_${a.numero}_${a.maestro.nombre.replace(/\s+/g,'_')}.doc`, blob);
+}
+function exportDocTodas(){
+  const data = buildAgendaData();
+  if(!data.length){ alert('Primero registra al menos un docente.'); return; }
+  const html = data.map(agendaHtmlBlock).join('\n');
+  const blob = new Blob(['\ufeff', wrapWordDoc(html)], {type:'application/msword'});
+  download('Agendas_Escolares_para_ajustes.doc', blob);
+}
+
+/* ============================= INIT ============================= */
+buildRail();
+showTab('grupos');
+renderGrupos();
+renderListadoGeneral();
+renderMaestros();
+renderHorarioMaestroSelect();
+renderDocumentos();
+renderAgendasPanel();
+document.getElementById('in-plantilla').value = state.plantilla.texto;
+document.getElementById('in-escuela').value = state.settings.escuela;
+renderPlantillaImagenPreview();
+renderOrdenSecciones();
+renderDocumentosOrdenBoard();
+renderMesesAsistenciaChecklist();
+</script>
+</body>
+</html>
